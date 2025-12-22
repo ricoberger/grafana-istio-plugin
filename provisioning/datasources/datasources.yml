@@ -1,0 +1,28 @@
+apiVersion: 1
+
+datasources:
+  - name: Istio
+    type: ricoberger-istio-datasource
+    uid: istio
+    access: proxy
+    isDefault: false
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      prometheusUrl: ${PROMETHEUS_URL}
+      prometheusAuthMethod: none
+      prometheusUsername:
+      istioWorkloadDashboard: /d/istio-workload-dashboard/istio-workload-dashboard
+      istioServiceDashboard: /d/istio-service-dashboard/istio-service-dashboard
+    secureJsonData:
+      prometheusPassword:
+      prometheusToken:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    isDefault: true
+    orgId: 1
+    editable: false
+    url: ${PROMETHEUS_URL}

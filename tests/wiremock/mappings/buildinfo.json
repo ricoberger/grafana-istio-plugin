@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/status/buildinfo"
+  },
+  "response": {
+    "status": 200,
+    "body": "{\"status\":\"success\",\"data\":{\"version\":\"3.8.0\",\"revision\":\"e44ed351cdf0181f9fde56ba096f4d949f9e295d\",\"branch\":\"HEAD\",\"buildUser\":\"root@e0c39c41863e\",\"buildDate\":\"20251202-09:12:01\",\"goVersion\":\"go1.25.4\"}}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

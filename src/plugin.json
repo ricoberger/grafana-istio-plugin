@@ -1,0 +1,66 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "datasource",
+  "name": "Istio",
+  "id": "ricoberger-istio-datasource",
+  "metrics": true,
+  "backend": true,
+  "executable": "gpx_istio",
+  "info": {
+    "keywords": [
+      "datasource",
+      "istio",
+      "prometheus"
+    ],
+    "description": "Istio plugin for Grafana.",
+    "author": {
+      "name": "Rico Berger"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      {
+        "name": "Repository",
+        "url": "https://github.com/ricoberger/grafana-istio-plugin"
+      },
+      {
+        "name": "Documentation",
+        "url": "https://github.com/ricoberger/grafana-istio-plugin/blob/main/README.md"
+      },
+      {
+        "name": "Issues",
+        "url": "https://github.com/ricoberger/grafana-istio-plugin/issues"
+      },
+      {
+        "name": "License",
+        "url": "https://github.com/ricoberger/grafana-istio-plugin/blob/main/LICENSE"
+      },
+      {
+        "name": "Sponsorship",
+        "url": "https://github.com/ricoberger"
+      }
+    ],
+    "screenshots": [
+      {
+        "name": "Example Bookinfo",
+        "path": "img/screenshots/example-bookinfo.png"
+      },
+      {
+        "name": "Example OTEL Demo",
+        "path": "img/screenshots/example-otel-demo.png"
+      },
+      {
+        "name": "Configuration",
+        "path": "img/screenshots/configuration.png"
+      }
+    ],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=11.6.0",
+    "plugins": []
+  }
+}

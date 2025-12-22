@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/label/source_workload_namespace/values"
+  },
+  "response": {
+    "status": 200,
+    "body": "{\"status\":\"success\",\"data\":[\"bookinfo\",\"echoserver\",\"istio-ingress\",\"observability\",\"otel-demo\"]}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

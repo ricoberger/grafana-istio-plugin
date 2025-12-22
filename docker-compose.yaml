@@ -1,0 +1,23 @@
+services:
+  grafana:
+    extends:
+      file: .config/docker-compose-base.yaml
+      service: grafana
+    build:
+      args:
+        grafana_image: ${GRAFANA_IMAGE:-grafana}
+        grafana_version: ${GRAFANA_VERSION:-12.3.0}
+    environment:
+      GF_LOG_FILTERS: plugin.ricoberger-istio-datasource:debug
+      GF_LOG_LEVEL: error
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://host.docker.internal:9090}
+    depends_on:
+      - wiremock
+
+  wiremock:
+    container_name: wiremock
+    image: wiremock/wiremock:3.13.2
+    volumes:
+      - ./tests/wiremock/mappings:/home/wiremock/mappings
+    ports:
+      - 8080:8080

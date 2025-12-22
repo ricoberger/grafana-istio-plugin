@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/label/source_app/values"
+  },
+  "response": {
+    "status": 200,
+    "body": "{\"status\":\"success\",\"data\":[]}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

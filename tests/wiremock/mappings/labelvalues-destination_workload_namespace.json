@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/label/destination_workload_namespace/values"
+  },
+  "response": {
+    "status": 200,
+    "body": "{\"status\":\"success\",\"data\":[\"bookinfo\",\"default\",\"echoserver\",\"observability\",\"otel-demo\",\"unknown\"]}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
