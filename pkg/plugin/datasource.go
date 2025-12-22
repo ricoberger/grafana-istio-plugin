@@ -42,8 +42,20 @@ func NewDatasource(_ context.Context, pCtx backend.DataSourceInstanceSettings) (
 		return nil, err
 	}
 
+	istioWarningThreshold := settings.IstioWarningThreshold
+	if istioWarningThreshold == 0 {
+		istioWarningThreshold = 0
+	}
+
+	istioErrorThreshold := settings.IstioErrorThreshold
+	if istioErrorThreshold == 0 {
+		istioErrorThreshold = 5
+	}
+
 	ds := &Datasource{
 		prometheusClient:       prometheusClient,
+		istioWarningThreshold:  istioWarningThreshold,
+		istioErrorThreshold:    istioErrorThreshold,
 		istioWorkloadDashboard: settings.IstioWorkloadDashboard,
 		istioServiceDashboard:  settings.IstioServiceDashboard,
 		logger:                 logger,
@@ -63,6 +75,8 @@ func NewDatasource(_ context.Context, pCtx backend.DataSourceInstanceSettings) (
 type Datasource struct {
 	queryHandler           backend.QueryDataHandler
 	prometheusClient       prometheus.Client
+	istioWarningThreshold  float64
+	istioErrorThreshold    float64
 	istioWorkloadDashboard string
 	istioServiceDashboard  string
 	logger                 log.Logger

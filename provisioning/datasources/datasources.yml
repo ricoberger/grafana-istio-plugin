@@ -13,6 +13,8 @@ datasources:
       prometheusUrl: ${PROMETHEUS_URL}
       prometheusAuthMethod: none
       prometheusUsername:
+      istioWarningThreshold: 0
+      istioErrorThreshold: 5
       istioWorkloadDashboard: /d/istio-workload-dashboard/istio-workload-dashboard
       istioServiceDashboard: /d/istio-service-dashboard/istio-service-dashboard
     secureJsonData:

@@ -17,6 +17,8 @@ type PluginSettings struct {
 	PrometheusUrl          string                `json:"prometheusUrl"`
 	PrometheusAuthMethod   string                `json:"prometheusAuthMethod"`
 	PrometheusUsername     string                `json:"prometheusUsername"`
+	IstioWarningThreshold  float64               `json:"istioWarningThreshold"`
+	IstioErrorThreshold    float64               `json:"istioErrorThreshold"`
 	IstioWorkloadDashboard string                `json:"istioWorkloadDashboard"`
 	IstioServiceDashboard  string                `json:"istioServiceDashboard"`
 	Secrets                *SecretPluginSettings `json:"-"`
