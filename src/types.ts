@@ -25,6 +25,7 @@ interface QueryModelGraph {
   namespace?: string;
   application?: string;
   metrics?: string[];
+  idleEdges?: boolean;
 }
 
 export type OptionsPrometheusAuthMethod = 'none' | 'basic' | 'token';

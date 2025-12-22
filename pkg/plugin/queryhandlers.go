@@ -206,7 +206,7 @@ func (d *Datasource) handleGraph(ctx context.Context, query concurrent.Query) ba
 
 			d.logger.Debug("Get metric", "metric", metric, "namespace", qm.Namespace, "application", qm.Application, "timeRangeFrom", query.DataQuery.TimeRange.From, "timeRangeTo", query.DataQuery.TimeRange.To, "interval", interval)
 
-			applicationTargetMetrics, err := d.prometheusClient.GetMetrics(ctx, metric, d.metricToQueryApplicationTarget(qm.Namespace, qm.Application, metric, interval), query.DataQuery.TimeRange)
+			applicationTargetMetrics, err := d.prometheusClient.GetMetrics(ctx, metric, d.metricToQueryApplicationTarget(qm.Namespace, qm.Application, metric, qm.IdleEdges, interval), query.DataQuery.TimeRange)
 			if err != nil {
 				d.logger.Error("Failed to get metric", "error", err.Error())
 				span.RecordError(err)
@@ -219,7 +219,7 @@ func (d *Datasource) handleGraph(ctx context.Context, query concurrent.Query) ba
 			}
 			d.logger.Debug("Retrieved metrics where application is target", "metric", metric, "namespace", qm.Namespace, "application", qm.Application, "metrics", applicationTargetMetrics)
 
-			applicationSourceMetrics, err := d.prometheusClient.GetMetrics(ctx, metric, d.metricToQueryApplicationSource(qm.Namespace, qm.Application, metric, interval), query.DataQuery.TimeRange)
+			applicationSourceMetrics, err := d.prometheusClient.GetMetrics(ctx, metric, d.metricToQueryApplicationSource(qm.Namespace, qm.Application, metric, qm.IdleEdges, interval), query.DataQuery.TimeRange)
 			if err != nil {
 				d.logger.Error("Failed to get metric", "error", err.Error())
 				span.RecordError(err)
@@ -355,47 +355,57 @@ func (d *Datasource) handleGraph(ctx context.Context, query concurrent.Query) ba
 	return response
 }
 
-func (d *Datasource) metricToQueryApplicationTarget(namespace, application, metric string, interval int64) string {
+func (d *Datasource) metricToQueryApplicationTarget(namespace, application, metric string, idleEdges bool, interval int64) string {
+	operator := "> 0"
+	if idleEdges {
+		operator = ""
+	}
+
 	switch metric {
 	case models.MetricGRPCRequests:
-		return fmt.Sprintf(`sum(increase(istio_requests_total{destination_workload_namespace="%s", destination_app="%s", request_protocol="grpc"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_requests_total{destination_workload_namespace="%s", destination_app="%s", request_protocol="grpc"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, application, interval, operator)
 	case models.MetricGRPCRequestDuration:
-		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{destination_workload_namespace="%s", destination_app="%s", request_protocol="grpc"}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status))`, namespace, application, interval)
+		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{destination_workload_namespace="%s", destination_app="%s", request_protocol="grpc"}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)) %s`, namespace, application, interval, operator)
 	case models.MetricGRPCSentMessages:
-		return fmt.Sprintf(`sum(increase(istio_request_messages_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_request_messages_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, application, interval, operator)
 	case models.MetricGRPCReceivedMessages:
-		return fmt.Sprintf(`sum(increase(istio_response_messages_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_response_messages_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, application, interval, operator)
 	case models.MetricHTTPRequests:
-		return fmt.Sprintf(`sum(increase(istio_requests_total{destination_workload_namespace="%s", destination_app="%s", request_protocol="http"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, response_code)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_requests_total{destination_workload_namespace="%s", destination_app="%s", request_protocol="http"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, response_code) %s`, namespace, application, interval, operator)
 	case models.MetricHTTPRequestDuration:
-		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{destination_workload_namespace="%s", destination_app="%s", request_protocol="http"}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status))`, namespace, application, interval)
+		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{destination_workload_namespace="%s", destination_app="%s", request_protocol="http"}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)) %s`, namespace, application, interval, operator)
 	case models.MetricTCPSentBytes:
-		return fmt.Sprintf(`sum(increase(istio_tcp_sent_bytes_total{destination_workload_namespace="%s", destination_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_tcp_sent_bytes_total{destination_workload_namespace="%s", destination_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, application, interval, operator)
 	case models.MetricTCPReceivedBytes:
-		return fmt.Sprintf(`sum(increase(istio_tcp_received_bytes_total{destination_workload_namespace="%s", destination_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_tcp_received_bytes_total{destination_workload_namespace="%s", destination_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, application, interval, operator)
 	default:
 		return ""
 	}
 }
 
-func (d *Datasource) metricToQueryApplicationSource(namespace, application, metric string, interval int64) string {
+func (d *Datasource) metricToQueryApplicationSource(namespace, application, metric string, idleEdges bool, interval int64) string {
+	operator := "> 0"
+	if idleEdges {
+		operator = ""
+	}
+
 	switch metric {
 	case models.MetricGRPCRequests:
-		return fmt.Sprintf(`sum(increase(istio_requests_total{source_workload_namespace="%s", source_app="%s", request_protocol="grpc"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_requests_total{source_workload_namespace="%s", source_app="%s", request_protocol="grpc"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, application, interval, operator)
 	case models.MetricGRPCRequestDuration:
-		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{source_workload_namespace="%s", source_app="%s", request_protocol="grpc"}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status))`, namespace, application, interval)
+		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{source_workload_namespace="%s", source_app="%s", request_protocol="grpc"}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)) %s`, namespace, application, interval, operator)
 	case models.MetricGRPCSentMessages:
-		return fmt.Sprintf(`sum(increase(istio_request_messages_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_request_messages_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, application, interval, operator)
 	case models.MetricGRPCReceivedMessages:
-		return fmt.Sprintf(`sum(increase(istio_response_messages_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_response_messages_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, application, interval, operator)
 	case models.MetricHTTPRequests:
-		return fmt.Sprintf(`sum(increase(istio_requests_total{source_workload_namespace="%s", source_app="%s", request_protocol="http"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, response_code)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_requests_total{source_workload_namespace="%s", source_app="%s", request_protocol="http"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, response_code) %s`, namespace, application, interval, operator)
 	case models.MetricHTTPRequestDuration:
-		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{source_workload_namespace="%s", source_app="%s", request_protocol="http"}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status))`, namespace, application, interval)
+		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{source_workload_namespace="%s", source_app="%s", request_protocol="http"}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)) %s`, namespace, application, interval, operator)
 	case models.MetricTCPSentBytes:
-		return fmt.Sprintf(`sum(increase(istio_tcp_sent_bytes_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_tcp_sent_bytes_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, application, interval, operator)
 	case models.MetricTCPReceivedBytes:
-		return fmt.Sprintf(`sum(increase(istio_tcp_received_bytes_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload)`, namespace, application, interval)
+		return fmt.Sprintf(`sum(increase(istio_tcp_received_bytes_total{source_workload_namespace="%s", source_app="%s"}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, application, interval, operator)
 	default:
 		return ""
 	}
