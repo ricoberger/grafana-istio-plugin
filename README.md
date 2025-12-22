@@ -55,10 +55,17 @@ export GF_PLUGINS_PREINSTALL_SYNC=ricoberger-istio-datasource@0.1.0@https://gith
   or node should be marked `red`. The default value is `5`.
 - **Istio Workload Dashboard:** The link to the
   [Istio workload dashboard](https://grafana.com/grafana/dashboards/7630-istio-workload-dashboard/),
-  e.g. `/d/istio-workload-dashboard/istio-workload-dashboard`.
+  e.g.
+  `/d/istio-workload-dashboard/istio-workload-dashboard?orgId=1&var-datasource=prometheus&var-qrep=waypoint&var-qrep=source&var-qrep=destination`.
+  The plugin adds the following query parameters to the provided dashboard url:
+  `&var-service=<SERVICE>&from=<FROM>&to=<TO>`. ``
 - **Istio Service Dashboard:** The link to the
   [Istio service dashboard](https://grafana.com/grafana/dashboards/7636-istio-service-dashboard/),
-  e.g. `/d/istio-service-dashboard/istio-service-dashboard`.
+  e.g.
+  `/d/istio-service-dashboard/istio-service-dashboard?orgId=1&var-datasource=prometheus&var-qrep=waypoint&var-qrep=source&var-qrep=destination`.
+  The plugin adds the following query parameters to the provided dashboard url:
+  `&var-namespace=<WORKLOAD-NAMESPACE>&var-workload=<WORKLOAD-NAME>&from=<FROM>&to=<TO>`.
+  ``
 
 ![Configuration](https://raw.githubusercontent.com/ricoberger/grafana-istio-plugin/refs/heads/main/src/img/screenshots/configuration.png)
 
