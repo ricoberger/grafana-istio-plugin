@@ -269,7 +269,7 @@ func (d *Datasource) handleGraph(ctx context.Context, query concurrent.Query) ba
 	edgeDetailsTCPReceivedBytes := edgeFields.Add("detail__tcpreceivedbytes", nil, []string{}, &data.FieldConfig{DisplayName: "TCP Received"})
 
 	for _, edge := range edges {
-		edgeField := getEdgeField(edge, float64(interval))
+		edgeField := d.getEdgeField(edge, float64(interval))
 
 		edgeIds.Append(edgeField.ID)
 		edgeSources.Append(edgeField.Source)
@@ -316,7 +316,7 @@ func (d *Datasource) handleGraph(ctx context.Context, query concurrent.Query) ba
 	})
 
 	for _, node := range nodes {
-		nodeField := getEdgeField(node, float64(interval))
+		nodeField := d.getEdgeField(node, float64(interval))
 
 		nodeIds.Append(nodeField.ID)
 		nodeTitles.Append(node.TargetType)
@@ -668,7 +668,7 @@ func (d *Datasource) edgesToNodes(edges []models.Edge) []models.Edge {
 	return nodesSlice
 }
 
-func getEdgeField(edge models.Edge, interval float64) models.EdgeField {
+func (d *Datasource) getEdgeField(edge models.Edge, interval float64) models.EdgeField {
 	edgeField := models.EdgeField{}
 	edgeField.ID = edge.ID
 	edgeField.Source = edge.Source
@@ -723,9 +723,9 @@ func getEdgeField(edge models.Edge, interval float64) models.EdgeField {
 			edgeField.MainStat = append(edgeField.MainStat, edgeField.DetailsHTTPErr)
 		}
 
-		if httpErrRate >= 5 {
+		if httpErrRate >= d.istioErrorThreshold {
 			edgeField.Color = "#f2495c"
-		} else if httpErrRate > 0 {
+		} else if httpErrRate > d.istioWarningThreshold {
 			edgeField.Color = "#fade2a"
 		} else {
 			edgeField.Color = "#73bf69"
@@ -743,9 +743,9 @@ func getEdgeField(edge models.Edge, interval float64) models.EdgeField {
 			edgeField.MainStat = append(edgeField.MainStat, edgeField.DetailsGRPCErr)
 		}
 
-		if grpcErrRate >= 5 {
+		if grpcErrRate >= d.istioErrorThreshold {
 			edgeField.Color = "#f2495c"
-		} else if grpcErrRate > 0 {
+		} else if grpcErrRate > d.istioWarningThreshold {
 			edgeField.Color = "#fade2a"
 		} else {
 			edgeField.Color = "#73bf69"

@@ -49,6 +49,10 @@ export GF_PLUGINS_PREINSTALL_SYNC=ricoberger-istio-datasource@0.1.0@https://gith
 - **Prometheus Authentication Method:** The authentication method which should
   be used for the Prometheus instance. The plugin supports basic authentication
   and bearer token authentication.
+- **Istio Warning Threshold:** The threshold in percent which defines when a
+  edge or node should be marked `yellow`. The default value is `0`.
+- **Istio Error Threshold:** The threshold in percent which defines when a edge
+  or node should be marked `red`. The default value is `5`.
 - **Istio Workload Dashboard:** The link to the
   [Istio workload dashboard](https://grafana.com/grafana/dashboards/7630-istio-workload-dashboard/),
   e.g. `/d/istio-workload-dashboard/istio-workload-dashboard`.

@@ -153,6 +153,37 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
 
       <div className={styles.container}>
         <h3>Istio</h3>
+        <InlineField label="Warning Threshold" labelWidth={25} interactive>
+          <Input
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              onOptionsChange({
+                ...options,
+                jsonData: {
+                  ...jsonData,
+                  istioWarningThreshold: parseFloat(event.target.value),
+                },
+              });
+            }}
+            value={jsonData.istioWarningThreshold}
+            width={40}
+          />
+        </InlineField>
+        <InlineField label="Error Threshold" labelWidth={25} interactive>
+          <Input
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              onOptionsChange({
+                ...options,
+                jsonData: {
+                  ...jsonData,
+                  istioErrorThreshold: parseFloat(event.target.value),
+                },
+              });
+            }}
+            value={jsonData.istioErrorThreshold}
+            width={40}
+          />
+        </InlineField>
+
         <InlineField label="Workload Dashboard" labelWidth={25} interactive>
           <Input
             onChange={(event: ChangeEvent<HTMLInputElement>) => {

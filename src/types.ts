@@ -33,6 +33,8 @@ export interface Options extends DataSourceJsonData {
   prometheusUrl?: string;
   prometheusAuthMethod?: OptionsPrometheusAuthMethod;
   prometheusUsername?: string;
+  istioWarningThreshold?: number;
+  istioErrorThreshold?: number;
   istioWorkloadDashboard?: string;
   istioServiceDashboard?: string;
 }
