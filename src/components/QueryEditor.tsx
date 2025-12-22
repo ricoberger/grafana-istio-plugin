@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { ChangeEvent } from 'react';
 import {
   ComboboxOption,
   InlineField,
   InlineFieldRow,
+  InlineSwitch,
   MultiCombobox,
 } from '@grafana/ui';
 import { QueryEditorProps } from '@grafana/data';
@@ -68,6 +69,15 @@ export function QueryEditor({
               ...query,
               metrics: Array.from(option.values()).map((value) => value.value),
             });
+          }}
+        />
+      </InlineField>
+      <InlineField label="Idle Edges">
+        <InlineSwitch
+          value={query.idleEdges || false}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            onChange({ ...query, idleEdges: event.target.checked });
+            onRunQuery();
           }}
         />
       </InlineField>

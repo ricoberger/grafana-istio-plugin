@@ -25,4 +25,5 @@ type QueryModelGraph struct {
 	Namespace   string   `json:"namespace"`
 	Application string   `json:"application"`
 	Metrics     []string `json:"metrics"`
+	IdleEdges   bool     `json:"idleEdges"`
 }
