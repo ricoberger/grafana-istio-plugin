@@ -337,9 +337,9 @@ func (d *Datasource) handleGraph(ctx context.Context, query concurrent.Query) ba
 
 		switch node.TargetType {
 		case "Service":
-			nodeLink.Append(fmt.Sprintf("%s?var-service=%s", d.istioServiceDashboard, node.TargetService))
+			nodeLink.Append(fmt.Sprintf("%s&var-service=%s&from=%d&to=%d", d.istioServiceDashboard, node.TargetService, query.DataQuery.TimeRange.From.UnixMilli(), query.DataQuery.TimeRange.To.UnixMilli()))
 		case "Workload":
-			nodeLink.Append(fmt.Sprintf("%s?var-namespace=%s&var-workload=%s", d.istioWorkloadDashboard, node.TargetNamespace, node.TargetName))
+			nodeLink.Append(fmt.Sprintf("%s&var-namespace=%s&var-workload=%s&from=%d&to=%d", d.istioWorkloadDashboard, node.TargetNamespace, node.TargetName, query.DataQuery.TimeRange.From.UnixMilli(), query.DataQuery.TimeRange.To.UnixMilli()))
 		default:
 			nodeLink.Append("")
 		}

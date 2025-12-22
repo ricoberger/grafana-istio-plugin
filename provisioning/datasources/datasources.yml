@@ -15,8 +15,8 @@ datasources:
       prometheusUsername:
       istioWarningThreshold: 0
       istioErrorThreshold: 5
-      istioWorkloadDashboard: /d/istio-workload-dashboard/istio-workload-dashboard
-      istioServiceDashboard: /d/istio-service-dashboard/istio-service-dashboard
+      istioWorkloadDashboard: /d/istio-workload-dashboard/istio-workload-dashboard?orgId=1&var-datasource=prometheus&var-qrep=waypoint&var-qrep=source&var-qrep=destination
+      istioServiceDashboard: /d/istio-service-dashboard/istio-service-dashboard?orgId=1&var-datasource=prometheus&var-qrep=waypoint&var-qrep=source&var-qrep=destination
     secureJsonData:
       prometheusPassword:
       prometheusToken:
