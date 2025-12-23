@@ -8,6 +8,7 @@ const (
 	QueryTypeWorkloads        = "workloads"
 	QueryTypeApplicationGraph = "applicationgraph"
 	QueryTypeWorkloadGraph    = "workloadgraph"
+	QueryTypeNamespaceGraph   = "namespacegraph"
 
 	MetricGRPCRequests         = "grpcRequests"
 	MetricGRPCRequestDuration  = "grpcRequestDuration"
@@ -37,6 +38,12 @@ type QueryModelApplicationGraph struct {
 type QueryModelWorkloadGraph struct {
 	Namespace string   `json:"namespace"`
 	Workload  string   `json:"workload"`
+	Metrics   []string `json:"metrics"`
+	IdleEdges bool     `json:"idleEdges"`
+}
+
+type QueryModelNamespaceGraph struct {
+	Namespace string   `json:"namespace"`
 	Metrics   []string `json:"metrics"`
 	IdleEdges bool     `json:"idleEdges"`
 }

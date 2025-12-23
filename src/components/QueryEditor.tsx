@@ -32,6 +32,7 @@ export function QueryEditor({
           options={[
             { label: 'Application Graph', value: 'applicationgraph' },
             { label: 'Workload Graph', value: 'workloadgraph' },
+            { label: 'Namespace Graph', value: 'namespacegraph' },
           ]}
           onChange={(option: ComboboxOption<QueryType>) => {
             onChange({

@@ -262,6 +262,33 @@ func (d *Datasource) handleWorkloadGraph(ctx context.Context, query concurrent.Q
 	return d.handleGraph(ctx, qm.Namespace, "", qm.Workload, qm.Metrics, qm.IdleEdges, query.DataQuery.TimeRange)
 }
 
+// handleNamespaceGraphQueries handles the queries to get graph for a namespace.
+// It uses the concurrent package to handle multiple queries in parallel. The
+// graph is generated for a specific namespace and contains all the requested
+// metrics.
+func (d *Datasource) handleNamespaceGraphQueries(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+	ctx, span := tracing.DefaultTracer().Start(ctx, "handleNamespaceGraphQueries")
+	defer span.End()
+
+	return concurrent.QueryData(ctx, req, d.handleNamespaceGraph, 10)
+}
+
+func (d *Datasource) handleNamespaceGraph(ctx context.Context, query concurrent.Query) backend.DataResponse {
+	ctx, span := tracing.DefaultTracer().Start(ctx, "handleNamespaceGraph")
+	defer span.End()
+
+	var qm models.QueryModelNamespaceGraph
+	err := json.Unmarshal(query.DataQuery.JSON, &qm)
+	if err != nil {
+		d.logger.Error("Failed to unmarshal query model", "error", err.Error())
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return backend.ErrorResponseWithErrorSource(err)
+	}
+
+	return d.handleGraph(ctx, qm.Namespace, "", "", qm.Metrics, qm.IdleEdges, query.DataQuery.TimeRange)
+}
+
 func (d *Datasource) handleGraph(ctx context.Context, namespace, application, workload string, metrics []string, idleEdges bool, timeRange backend.TimeRange) backend.DataResponse {
 	ctx, span := tracing.DefaultTracer().Start(ctx, "handleGraph")
 	defer span.End()

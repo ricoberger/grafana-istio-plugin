@@ -29,6 +29,15 @@ export const DEFAULT_QUERIES: Record<QueryType, Partial<Query>> = {
       'tcpReceivedBytes',
     ],
   },
+  namespacegraph: {
+    namespace: '',
+    metrics: [
+      'grpcRequests',
+      'httpRequests',
+      'tcpSentBytes',
+      'tcpReceivedBytes',
+    ],
+  },
 };
 
 export const DEFAULT_QUERY: Partial<Query> = {
@@ -43,14 +52,16 @@ export type QueryType =
   | 'applications'
   | 'workloads'
   | 'applicationgraph'
-  | 'workloadgraph';
+  | 'workloadgraph'
+  | 'namespacegraph';
 
 export interface Query
   extends DataQuery,
   QueryModelApplications,
   QueryModelWorkloads,
   QueryModelApplicationGraph,
-  QueryModelWorkloadGraph {
+  QueryModelWorkloadGraph,
+  QueryModelNamespaceGraph {
   queryType: QueryType;
 }
 
@@ -70,6 +81,13 @@ interface QueryModelApplicationGraph {
 }
 
 interface QueryModelWorkloadGraph {
+  namespace?: string;
+  workload?: string;
+  metrics?: string[];
+  idleEdges?: boolean;
+}
+
+interface QueryModelNamespaceGraph {
   namespace?: string;
   workload?: string;
   metrics?: string[];
