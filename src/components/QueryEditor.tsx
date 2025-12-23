@@ -39,6 +39,9 @@ export function QueryEditor({
               ...query,
               ...DEFAULT_QUERIES[option.value],
               queryType: option.value,
+              namespace: query.namespace,
+              metrics: query.metrics,
+              idleEdges: query.idleEdges,
             });
             onRunQuery();
           }}
@@ -50,7 +53,12 @@ export function QueryEditor({
         range={range}
         namespace={query.namespace}
         onNamespaceChange={(namespace) => {
-          onChange({ ...query, namespace: namespace, application: '' });
+          onChange({
+            ...query,
+            namespace: namespace,
+            application: '',
+            workload: '',
+          });
           onRunQuery();
         }}
       />
