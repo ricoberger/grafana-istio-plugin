@@ -29,6 +29,7 @@ export class DataSource extends DataSourceWithBackend<Query, Options> {
       queryType: query.queryType || DEFAULT_QUERY.queryType,
       namespace: getTemplateSrv().replace(query.namespace, scopedVars),
       application: getTemplateSrv().replace(query.application, scopedVars),
+      workload: getTemplateSrv().replace(query.workload, scopedVars),
     };
   }
 
