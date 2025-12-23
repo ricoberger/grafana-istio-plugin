@@ -9,6 +9,12 @@ export const DEFAULT_QUERIES: Record<QueryType, Partial<Query>> = {
   workloads: {
     namespace: '',
   },
+  filters: {
+    type: 'source',
+    namespace: '',
+    application: '',
+    workload: '',
+  },
   applicationgraph: {
     namespace: '',
     application: '',
@@ -51,6 +57,7 @@ export type QueryType =
   | 'namespaces'
   | 'applications'
   | 'workloads'
+  | 'filters'
   | 'applicationgraph'
   | 'workloadgraph'
   | 'namespacegraph';
@@ -59,6 +66,7 @@ export interface Query
   extends DataQuery,
   QueryModelApplications,
   QueryModelWorkloads,
+  QueryModelFilters,
   QueryModelApplicationGraph,
   QueryModelWorkloadGraph,
   QueryModelNamespaceGraph {
@@ -73,11 +81,20 @@ interface QueryModelWorkloads {
   namespace?: string;
 }
 
+interface QueryModelFilters {
+  type?: 'source' | 'destination';
+  namespace?: string;
+  application?: string;
+  workload?: string;
+}
+
 interface QueryModelApplicationGraph {
   namespace?: string;
   application?: string;
   metrics?: string[];
   idleEdges?: boolean;
+  sourceFilters?: string[];
+  destinationFilters?: string[];
 }
 
 interface QueryModelWorkloadGraph {
@@ -85,6 +102,8 @@ interface QueryModelWorkloadGraph {
   workload?: string;
   metrics?: string[];
   idleEdges?: boolean;
+  sourceFilters?: string[];
+  destinationFilters?: string[];
 }
 
 interface QueryModelNamespaceGraph {
@@ -92,6 +111,8 @@ interface QueryModelNamespaceGraph {
   workload?: string;
   metrics?: string[];
   idleEdges?: boolean;
+  sourceFilters?: string[];
+  destinationFilters?: string[];
 }
 
 export type OptionsPrometheusAuthMethod = 'none' | 'basic' | 'token';

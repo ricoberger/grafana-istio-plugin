@@ -6,6 +6,7 @@ const (
 	QueryTypeNamespaces       = "namespaces"
 	QueryTypeApplications     = "applications"
 	QueryTypeWorkloads        = "workloads"
+	QueryTypeFilters          = "filters"
 	QueryTypeApplicationGraph = "applicationgraph"
 	QueryTypeWorkloadGraph    = "workloadgraph"
 	QueryTypeNamespaceGraph   = "namespacegraph"
@@ -28,22 +29,35 @@ type QueryModelWorkloads struct {
 	Namespace string `json:"namespace"`
 }
 
+type QueryModelFilters struct {
+	Type        string `json:"type"`
+	Namespace   string `json:"namespace"`
+	Application string `json:"application"`
+	Workload    string `json:"workload"`
+}
+
 type QueryModelApplicationGraph struct {
-	Namespace   string   `json:"namespace"`
-	Application string   `json:"application"`
-	Metrics     []string `json:"metrics"`
-	IdleEdges   bool     `json:"idleEdges"`
+	Namespace          string   `json:"namespace"`
+	Application        string   `json:"application"`
+	Metrics            []string `json:"metrics"`
+	IdleEdges          bool     `json:"idleEdges"`
+	SourceFilters      []string `json:"sourceFilters"`
+	DestinationFilters []string `json:"destinationFilters"`
 }
 
 type QueryModelWorkloadGraph struct {
-	Namespace string   `json:"namespace"`
-	Workload  string   `json:"workload"`
-	Metrics   []string `json:"metrics"`
-	IdleEdges bool     `json:"idleEdges"`
+	Namespace          string   `json:"namespace"`
+	Workload           string   `json:"workload"`
+	Metrics            []string `json:"metrics"`
+	IdleEdges          bool     `json:"idleEdges"`
+	SourceFilters      []string `json:"sourceFilters"`
+	DestinationFilters []string `json:"destinationFilters"`
 }
 
 type QueryModelNamespaceGraph struct {
-	Namespace string   `json:"namespace"`
-	Metrics   []string `json:"metrics"`
-	IdleEdges bool     `json:"idleEdges"`
+	Namespace          string   `json:"namespace"`
+	Metrics            []string `json:"metrics"`
+	IdleEdges          bool     `json:"idleEdges"`
+	SourceFilters      []string `json:"sourceFilters"`
+	DestinationFilters []string `json:"destinationFilters"`
 }

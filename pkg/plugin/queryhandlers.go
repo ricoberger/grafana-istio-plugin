@@ -136,6 +136,138 @@ func (d *Datasource) handleWorkloads(ctx context.Context, query concurrent.Query
 	return d.handelLabelValues(ctx, queries, query.DataQuery.TimeRange)
 }
 
+// handleFilterQueries handles the queries to get a list of workloads for a
+// namespace, application or workload which can be used asa filters. This means
+// which should not be included in the generated graph. It uses the concurrent
+// package to handle multiple queries in parallel.
+func (d *Datasource) handleFiltersQueries(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+	ctx, span := tracing.DefaultTracer().Start(ctx, "handleFiltersQueries")
+	defer span.End()
+
+	return concurrent.QueryData(ctx, req, d.handleFilters, 10)
+}
+
+func (d *Datasource) handleFilters(ctx context.Context, query concurrent.Query) backend.DataResponse {
+	ctx, span := tracing.DefaultTracer().Start(ctx, "handleFilters")
+	defer span.End()
+
+	var qm models.QueryModelFilters
+	err := json.Unmarshal(query.DataQuery.JSON, &qm)
+	if err != nil {
+		d.logger.Error("Failed to unmarshal query model", "error", err.Error())
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return backend.ErrorResponseWithErrorSource(err)
+	}
+
+	var namespaceLabel string
+	var workloadLabel string
+	var queries []string
+
+	switch qm.Type {
+	case "source":
+		namespaceLabel = "source_workload_namespace"
+		workloadLabel = "source_workload"
+
+		destinationLabel := ""
+		if qm.Application != "" {
+			destinationLabel = fmt.Sprintf(`, destination_app="%s"`, qm.Application)
+		} else if qm.Workload != "" {
+			destinationLabel = fmt.Sprintf(`, destination_workload="%s"`, qm.Workload)
+		}
+
+		queries = []string{
+			fmt.Sprintf("sum(istio_requests_total{destination_workload_namespace=\"%s\" %s}) by (source_workload_namespace, source_workload)", qm.Namespace, destinationLabel),
+			fmt.Sprintf("sum(istio_tcp_sent_bytes_total{destination_workload_namespace=\"%s\" %s}) by (source_workload_namespace, source_workload)", qm.Namespace, destinationLabel),
+			fmt.Sprintf("sum(istio_tcp_received_bytes_total{destination_workload_namespace=\"%s\" %s}) by (source_workload_namespace, source_workload)", qm.Namespace, destinationLabel),
+		}
+	case "destination":
+		namespaceLabel = "destination_workload_namespace"
+		workloadLabel = "destination_workload"
+
+		sourceLabel := ""
+		if qm.Application != "" {
+			sourceLabel = fmt.Sprintf(`, source_app="%s"`, qm.Application)
+		} else if qm.Workload != "" {
+			sourceLabel = fmt.Sprintf(`, source_workload="%s"`, qm.Workload)
+		}
+
+		queries = []string{
+			fmt.Sprintf("sum(istio_requests_total{source_workload_namespace=\"%s\" %s}) by (destination_workload_namespace, destination_workload)", qm.Namespace, sourceLabel),
+			fmt.Sprintf("sum(istio_tcp_sent_bytes_total{source_workload_namespace=\"%s\" %s}) by (destination_workload_namespace, destination_workload)", qm.Namespace, sourceLabel),
+			fmt.Sprintf("sum(istio_tcp_received_bytes_total{source_workload_namespace=\"%s\" %s}) by (destination_workload_namespace, destination_workload)", qm.Namespace, sourceLabel),
+		}
+	}
+
+	var errors []error
+	errorsMutex := &sync.Mutex{}
+
+	var values []string
+	valuesMutex := &sync.Mutex{}
+
+	var queriesWG sync.WaitGroup
+	queriesWG.Add(len(queries))
+
+	for _, q := range queries {
+		go func(q string) {
+			defer queriesWG.Done()
+
+			d.logger.Debug("Get metrics", "query", q, "timeRangeFrom", query.DataQuery.TimeRange.From, "timeRangeTo", query.DataQuery.TimeRange.To)
+			metrics, err := d.prometheusClient.GetMetrics(ctx, "", q, query.DataQuery.TimeRange)
+			if err != nil {
+				d.logger.Error("Failed to get metrics", "error", err.Error())
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+
+				errorsMutex.Lock()
+				errors = append(errors, err)
+				errorsMutex.Unlock()
+				return
+			}
+			d.logger.Debug("Retrieved metrics", "query", q, "metrics", metrics)
+
+			var vs []string
+			for _, metric := range metrics {
+				if namespace, ok := metric.Labels[namespaceLabel]; ok {
+					if workload, ok := metric.Labels[workloadLabel]; ok {
+						vs = append(vs, fmt.Sprintf("%s/%s", namespace, workload))
+					}
+				}
+			}
+
+			valuesMutex.Lock()
+			values = append(values, vs...)
+			valuesMutex.Unlock()
+		}(q)
+	}
+
+	queriesWG.Wait()
+
+	if len(errors) > 0 {
+		span.RecordError(errors[0])
+		span.SetStatus(codes.Error, errors[0].Error())
+		return backend.ErrorResponseWithErrorSource(errors[0])
+	}
+
+	slices.Sort(values)
+	values = slices.Compact(values)
+
+	frame := data.NewFrame(
+		"Values",
+		data.NewField("values", nil, values),
+	)
+
+	frame.SetMeta(&data.FrameMeta{
+		PreferredVisualization: data.VisTypeTable,
+		Type:                   data.FrameTypeTable,
+	})
+
+	var response backend.DataResponse
+	response.Frames = append(response.Frames, frame)
+
+	return response
+}
+
 // handleLabelValues retrieves the values for the given labels and filter from
 // the "istio_requests_total", "istio_tcp_sent_bytes_total", and
 // "istio_tcp_received_bytes_total" metrics. It performs the retrieval in
@@ -232,7 +364,7 @@ func (d *Datasource) handleApplicationGraph(ctx context.Context, query concurren
 		return backend.ErrorResponseWithErrorSource(err)
 	}
 
-	return d.handleGraph(ctx, qm.Namespace, qm.Application, "", qm.Metrics, qm.IdleEdges, query.DataQuery.TimeRange)
+	return d.handleGraph(ctx, qm.Namespace, qm.Application, "", qm.Metrics, qm.SourceFilters, qm.DestinationFilters, qm.IdleEdges, query.DataQuery.TimeRange)
 }
 
 // handleWorkloadGraphQueries handles the queries to get graph for a workload.
@@ -259,7 +391,7 @@ func (d *Datasource) handleWorkloadGraph(ctx context.Context, query concurrent.Q
 		return backend.ErrorResponseWithErrorSource(err)
 	}
 
-	return d.handleGraph(ctx, qm.Namespace, "", qm.Workload, qm.Metrics, qm.IdleEdges, query.DataQuery.TimeRange)
+	return d.handleGraph(ctx, qm.Namespace, "", qm.Workload, qm.Metrics, qm.SourceFilters, qm.DestinationFilters, qm.IdleEdges, query.DataQuery.TimeRange)
 }
 
 // handleNamespaceGraphQueries handles the queries to get graph for a namespace.
@@ -286,10 +418,10 @@ func (d *Datasource) handleNamespaceGraph(ctx context.Context, query concurrent.
 		return backend.ErrorResponseWithErrorSource(err)
 	}
 
-	return d.handleGraph(ctx, qm.Namespace, "", "", qm.Metrics, qm.IdleEdges, query.DataQuery.TimeRange)
+	return d.handleGraph(ctx, qm.Namespace, "", "", qm.Metrics, qm.SourceFilters, qm.DestinationFilters, qm.IdleEdges, query.DataQuery.TimeRange)
 }
 
-func (d *Datasource) handleGraph(ctx context.Context, namespace, application, workload string, metrics []string, idleEdges bool, timeRange backend.TimeRange) backend.DataResponse {
+func (d *Datasource) handleGraph(ctx context.Context, namespace, application, workload string, metrics, sourceFilters, destinationFilters []string, idleEdges bool, timeRange backend.TimeRange) backend.DataResponse {
 	ctx, span := tracing.DefaultTracer().Start(ctx, "handleGraph")
 	defer span.End()
 
@@ -351,7 +483,7 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 		return backend.ErrorResponseWithErrorSource(errors[0])
 	}
 
-	edges := d.metricsToEdges(prometheusMetrics)
+	edges := d.metricsToEdges(prometheusMetrics, sourceFilters, destinationFilters)
 	nodes := d.edgesToNodes(edges)
 
 	edgeFields := models.Fields{}
@@ -529,10 +661,14 @@ func (d *Datasource) metricToPrometheusSourcesQuery(namespace, application, work
 	}
 }
 
-func (d *Datasource) metricsToEdges(metrics []prometheus.Metric) []models.Edge {
+func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, destinationFilters []string) []models.Edge {
 	edges := make(map[string]models.Edge)
 
 	for _, m := range metrics {
+		if slices.Contains(sourceFilters, fmt.Sprintf("%s/%s", m.Labels["source_workload_namespace"], m.Labels["source_workload"])) || slices.Contains(destinationFilters, fmt.Sprintf("%s/%s", m.Labels["destination_workload_namespace"], m.Labels["destination_workload"])) {
+			continue
+		}
+
 		workloadToServiceId := fmt.Sprintf("Workload: %s (%s) - Service: %s (%s)", m.Labels["source_workload"], m.Labels["source_workload_namespace"], m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
 		workloadToServiceSource := fmt.Sprintf("Workload: %s (%s)", m.Labels["source_workload"], m.Labels["source_workload_namespace"])
 		workloadToServiceSourceType := "Workload"
