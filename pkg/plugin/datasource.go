@@ -64,7 +64,9 @@ func NewDatasource(_ context.Context, pCtx backend.DataSourceInstanceSettings) (
 	queryTypeMux := datasource.NewQueryTypeMux()
 	queryTypeMux.HandleFunc(models.QueryTypeNamespaces, ds.handleNamespacesQueries)
 	queryTypeMux.HandleFunc(models.QueryTypeApplications, ds.handleApplicationsQueries)
-	queryTypeMux.HandleFunc(models.QueryTypeGraph, ds.handleGraphQueries)
+	queryTypeMux.HandleFunc(models.QueryTypeWorkloads, ds.handleWorkloadsQueries)
+	queryTypeMux.HandleFunc(models.QueryTypeApplicationGraph, ds.handleApplicationGraphQueries)
+	queryTypeMux.HandleFunc(models.QueryTypeWorkloadGraph, ds.handleWorkloadGraphQueries)
 	ds.queryHandler = queryTypeMux
 
 	return ds, nil

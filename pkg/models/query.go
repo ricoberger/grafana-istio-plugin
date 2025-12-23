@@ -3,9 +3,11 @@ package models
 type QueryType string
 
 const (
-	QueryTypeNamespaces   = "namespaces"
-	QueryTypeApplications = "applications"
-	QueryTypeGraph        = "graph"
+	QueryTypeNamespaces       = "namespaces"
+	QueryTypeApplications     = "applications"
+	QueryTypeWorkloads        = "workloads"
+	QueryTypeApplicationGraph = "applicationgraph"
+	QueryTypeWorkloadGraph    = "workloadgraph"
 
 	MetricGRPCRequests         = "grpcRequests"
 	MetricGRPCRequestDuration  = "grpcRequestDuration"
@@ -21,9 +23,20 @@ type QueryModelApplications struct {
 	Namespace string `json:"namespace"`
 }
 
-type QueryModelGraph struct {
+type QueryModelWorkloads struct {
+	Namespace string `json:"namespace"`
+}
+
+type QueryModelApplicationGraph struct {
 	Namespace   string   `json:"namespace"`
 	Application string   `json:"application"`
 	Metrics     []string `json:"metrics"`
 	IdleEdges   bool     `json:"idleEdges"`
+}
+
+type QueryModelWorkloadGraph struct {
+	Namespace string   `json:"namespace"`
+	Workload  string   `json:"workload"`
+	Metrics   []string `json:"metrics"`
+	IdleEdges bool     `json:"idleEdges"`
 }

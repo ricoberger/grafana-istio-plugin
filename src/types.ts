@@ -1,19 +1,56 @@
 import { DataSourceJsonData } from '@grafana/data';
 import { DataQuery } from '@grafana/schema';
 
+export const DEFAULT_QUERIES: Record<QueryType, Partial<Query>> = {
+  namespaces: {},
+  applications: {
+    namespace: '',
+  },
+  workloads: {
+    namespace: '',
+  },
+  applicationgraph: {
+    namespace: '',
+    application: '',
+    metrics: [
+      'grpcRequests',
+      'httpRequests',
+      'tcpSentBytes',
+      'tcpReceivedBytes',
+    ],
+  },
+  workloadgraph: {
+    namespace: '',
+    workload: '',
+    metrics: [
+      'grpcRequests',
+      'httpRequests',
+      'tcpSentBytes',
+      'tcpReceivedBytes',
+    ],
+  },
+};
+
 export const DEFAULT_QUERY: Partial<Query> = {
-  queryType: 'graph',
+  queryType: 'applicationgraph',
   namespace: '',
   application: '',
   metrics: ['grpcRequests', 'httpRequests', 'tcpSentBytes', 'tcpReceivedBytes'],
 };
 
-export type QueryType = 'namespaces' | 'applications' | 'graph';
+export type QueryType =
+  | 'namespaces'
+  | 'applications'
+  | 'workloads'
+  | 'applicationgraph'
+  | 'workloadgraph';
 
 export interface Query
   extends DataQuery,
   QueryModelApplications,
-  QueryModelGraph {
+  QueryModelWorkloads,
+  QueryModelApplicationGraph,
+  QueryModelWorkloadGraph {
   queryType: QueryType;
 }
 
@@ -21,9 +58,20 @@ interface QueryModelApplications {
   namespace?: string;
 }
 
-interface QueryModelGraph {
+interface QueryModelWorkloads {
+  namespace?: string;
+}
+
+interface QueryModelApplicationGraph {
   namespace?: string;
   application?: string;
+  metrics?: string[];
+  idleEdges?: boolean;
+}
+
+interface QueryModelWorkloadGraph {
+  namespace?: string;
+  workload?: string;
   metrics?: string[];
   idleEdges?: boolean;
 }
