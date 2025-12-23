@@ -1,5 +1,6 @@
 import React, { ChangeEvent } from 'react';
 import {
+  Combobox,
   ComboboxOption,
   InlineField,
   InlineFieldRow,
@@ -9,9 +10,10 @@ import {
 import { QueryEditorProps } from '@grafana/data';
 
 import { DataSource } from '../datasource';
-import { Options, Query } from '../types';
+import { DEFAULT_QUERIES, Options, Query, QueryType } from '../types';
 import { NamespaceField } from './NamespaceField';
 import { ApplicationField } from './ApplicationField';
+import { WorkloadField } from './WorkloadField';
 
 type Props = QueryEditorProps<DataSource, Query, Options>;
 
@@ -24,6 +26,24 @@ export function QueryEditor({
 }: Props) {
   return (
     <InlineFieldRow>
+      <InlineField label="Graph">
+        <Combobox<QueryType>
+          value={query.queryType}
+          options={[
+            { label: 'Application Graph', value: 'applicationgraph' },
+            { label: 'Workload Graph', value: 'workloadgraph' },
+          ]}
+          onChange={(option: ComboboxOption<QueryType>) => {
+            onChange({
+              ...query,
+              ...DEFAULT_QUERIES[option.value],
+              queryType: option.value,
+            });
+            onRunQuery();
+          }}
+        />
+      </InlineField>
+
       <NamespaceField
         datasource={datasource}
         range={range}
@@ -33,16 +53,33 @@ export function QueryEditor({
           onRunQuery();
         }}
       />
-      <ApplicationField
-        datasource={datasource}
-        range={range}
-        namespace={query.namespace}
-        application={query.application}
-        onApplicationChange={(application) => {
-          onChange({ ...query, application: application });
-          onRunQuery();
-        }}
-      />
+
+      {query.queryType === 'applicationgraph' && (
+        <ApplicationField
+          datasource={datasource}
+          range={range}
+          namespace={query.namespace}
+          application={query.application}
+          onApplicationChange={(application) => {
+            onChange({ ...query, application: application });
+            onRunQuery();
+          }}
+        />
+      )}
+
+      {query.queryType === 'workloadgraph' && (
+        <WorkloadField
+          datasource={datasource}
+          range={range}
+          namespace={query.namespace}
+          workload={query.workload}
+          onWorkloadChange={(workload) => {
+            onChange({ ...query, workload: workload });
+            onRunQuery();
+          }}
+        />
+      )}
+
       <InlineField label="Metrics">
         <MultiCombobox
           data-testid="metrics-combobox"

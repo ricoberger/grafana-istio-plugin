@@ -23,6 +23,7 @@ export class DataSource extends DataSourceWithBackend<Query, Options> {
   }
 
   applyTemplateVariables(query: Query, scopedVars: ScopedVars) {
+    console.log('Applying template variables to query:', query);
     return {
       ...query,
       queryType: query.queryType || DEFAULT_QUERY.queryType,
@@ -32,9 +33,6 @@ export class DataSource extends DataSourceWithBackend<Query, Options> {
   }
 
   query(request: DataQueryRequest<Query>): Observable<DataQueryResponse> {
-    request.targets.map((query) => {
-      return this.applyTemplateVariables(query, request.scopedVars);
-    });
     return super.query(request);
   }
 
@@ -75,9 +73,20 @@ export class DataSource extends DataSourceWithBackend<Query, Options> {
       return false;
     }
 
+    if (query.queryType === 'workloads' && !query.namespace) {
+      return false;
+    }
+
     if (
-      query.queryType === 'graph' &&
+      query.queryType === 'applicationgraph' &&
       (!query.namespace || !query.application)
+    ) {
+      return false;
+    }
+
+    if (
+      query.queryType === 'workloadgraph' &&
+      (!query.namespace || !query.workload)
     ) {
       return false;
     }
