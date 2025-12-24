@@ -12,10 +12,12 @@ import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { lastValueFrom, Observable } from 'rxjs';
 
 import { Query, Options, DEFAULT_QUERY } from './types';
+import { VariableSupport } from './variablesupport';
 
 export class DataSource extends DataSourceWithBackend<Query, Options> {
   constructor(instanceSettings: DataSourceInstanceSettings<Options>) {
     super(instanceSettings);
+    this.variables = new VariableSupport(this);
   }
 
   getDefaultQuery(_: CoreApp): Partial<Query> {
@@ -23,13 +25,34 @@ export class DataSource extends DataSourceWithBackend<Query, Options> {
   }
 
   applyTemplateVariables(query: Query, scopedVars: ScopedVars) {
-    console.log('Applying template variables to query:', query);
+    const sourceFilters = [];
+    if (query.sourceFilters) {
+      for (const sourceFilter of query.sourceFilters) {
+        const sf = getTemplateSrv()
+          .replace(sourceFilter, scopedVars)
+          .split(',');
+        sourceFilters.push(...sf);
+      }
+    }
+
+    const destinationFilters = [];
+    if (query.destinationFilters) {
+      for (const destinationFilter of query.destinationFilters) {
+        const df = getTemplateSrv()
+          .replace(destinationFilter, scopedVars)
+          .split(',');
+        destinationFilters.push(...df);
+      }
+    }
+
     return {
       ...query,
       queryType: query.queryType || DEFAULT_QUERY.queryType,
       namespace: getTemplateSrv().replace(query.namespace, scopedVars),
       application: getTemplateSrv().replace(query.application, scopedVars),
       workload: getTemplateSrv().replace(query.workload, scopedVars),
+      sourceFilters: sourceFilters,
+      destinationFilters: destinationFilters,
     };
   }
 
@@ -75,6 +98,10 @@ export class DataSource extends DataSourceWithBackend<Query, Options> {
     }
 
     if (query.queryType === 'workloads' && !query.namespace) {
+      return false;
+    }
+
+    if (query.queryType === 'filters' && (!query.type || !query.namespace)) {
       return false;
     }
 

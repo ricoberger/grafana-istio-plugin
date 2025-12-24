@@ -1,0 +1,215 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "ricoberger-istio-datasource",
+        "uid": "istio"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 23,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "edges": {},
+        "layoutAlgorithm": "layered",
+        "nodes": {},
+        "zoomMode": "cooperative"
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "application": "",
+          "datasource": {
+            "type": "ricoberger-istio-datasource",
+            "uid": "istio"
+          },
+          "destinationFilters": [
+            "${destinationfilter:csv}"
+          ],
+          "metrics": [
+            "grpcRequests",
+            "httpRequests",
+            "tcpSentBytes",
+            "tcpReceivedBytes",
+            "httpRequestDuration",
+            "grpcReceivedMessages",
+            "grpcSentMessages",
+            "grpcRequestDuration"
+          ],
+          "namespace": "${namespace}",
+          "queryType": "workloadgraph",
+          "refId": "A",
+          "sourceFilters": [
+            "${sourcefilter:csv}"
+          ],
+          "workload": "${workload}"
+        }
+      ],
+      "title": "Workload Graph",
+      "type": "nodeGraph"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 42,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "bookinfo",
+          "value": "bookinfo"
+        },
+        "datasource": {
+          "type": "ricoberger-istio-datasource",
+          "uid": "istio"
+        },
+        "definition": "",
+        "description": "",
+        "label": "Namespace",
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "queryType": "namespaces"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "productpage-v1",
+          "value": "productpage-v1"
+        },
+        "datasource": {
+          "type": "ricoberger-istio-datasource",
+          "uid": "istio"
+        },
+        "definition": "",
+        "description": "",
+        "label": "Workload",
+        "name": "workload",
+        "options": [],
+        "query": {
+          "application": "",
+          "namespace": "${namespace}",
+          "queryType": "workloads",
+          "workload": ""
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": [
+            "None"
+          ],
+          "value": [
+            "none"
+          ]
+        },
+        "datasource": {
+          "type": "ricoberger-istio-datasource",
+          "uid": "istio"
+        },
+        "definition": "",
+        "label": "Source Filter",
+        "multi": true,
+        "name": "sourcefilter",
+        "options": [],
+        "query": {
+          "application": "",
+          "namespace": "${namespace}",
+          "queryType": "filters",
+          "type": "source",
+          "workload": "${workload}"
+        },
+        "refresh": 1,
+        "regex": "",
+        "staticOptions": [
+          {
+            "text": "None",
+            "value": "none"
+          }
+        ],
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": [
+            "None"
+          ],
+          "value": [
+            "none"
+          ]
+        },
+        "datasource": {
+          "type": "ricoberger-istio-datasource",
+          "uid": "istio"
+        },
+        "definition": "",
+        "label": "Destination Filter",
+        "multi": true,
+        "name": "destinationfilter",
+        "options": [],
+        "query": {
+          "application": "",
+          "namespace": "${namespace}",
+          "queryType": "filters",
+          "type": "destination",
+          "workload": "${workload}"
+        },
+        "refresh": 1,
+        "regex": "",
+        "staticOptions": [
+          {
+            "text": "None",
+            "value": "none"
+          }
+        ],
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Istio Workload Graph Dashboard",
+  "uid": "istio-workload-graph-dashboard",
+  "version": 1
+}
