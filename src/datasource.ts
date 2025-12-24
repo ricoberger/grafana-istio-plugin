@@ -119,6 +119,10 @@ export class DataSource extends DataSourceWithBackend<Query, Options> {
       return false;
     }
 
+    if (query.queryType === 'namespacegraph' && !query.namespace) {
+      return false;
+    }
+
     return true;
   }
 }
