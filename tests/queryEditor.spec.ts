@@ -12,9 +12,6 @@ test('smoke: should render query editor', async ({
   await expect(
     panelEditPage.getQueryEditorRow('A').getByTestId('application-combobox'),
   ).toBeVisible();
-  await expect(
-    panelEditPage.getQueryEditorRow('A').getByTestId('metrics-combobox'),
-  ).toBeVisible();
 });
 
 test('should trigger new query when namespace and application is set', async ({

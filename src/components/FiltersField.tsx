@@ -53,6 +53,7 @@ export function FiltersField({
   return (
     <InlineField
       label={filterType === 'source' ? 'Source Filters' : 'Destination Filters'}
+      labelWidth={25}
     >
       <MultiCombobox
         data-testid={`${filterType}-filters-combobox`}

@@ -41,7 +41,7 @@ export function WorkloadField({
   }, [datasource, namespace]);
 
   return (
-    <InlineField label="Workload">
+    <InlineField label="Workload" labelWidth={25}>
       <Combobox<string>
         data-testid="workload-combobox"
         value={workload}
