@@ -101,7 +101,10 @@ export class DataSource extends DataSourceWithBackend<Query, Options> {
       return false;
     }
 
-    if (query.queryType === 'filters' && (!query.type || !query.namespace)) {
+    if (
+      query.queryType === 'filters' &&
+      (!query.filterType || !query.namespace)
+    ) {
       return false;
     }
 

@@ -145,7 +145,7 @@ export function QueryEditor({
         <FiltersField
           datasource={datasource}
           range={range}
-          type="source"
+          filterType="source"
           namespace={query.namespace}
           application={query.application}
           workload={query.workload}
@@ -159,7 +159,7 @@ export function QueryEditor({
         <FiltersField
           datasource={datasource}
           range={range}
-          type="destination"
+          filterType="destination"
           namespace={query.namespace}
           application={query.application}
           workload={query.workload}

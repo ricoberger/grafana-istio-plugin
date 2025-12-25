@@ -34,7 +34,7 @@ export function NamespaceField({
   }, [datasource]);
 
   return (
-    <InlineField label="Namespace">
+    <InlineField label="Namespace" labelWidth={25}>
       <Combobox<string>
         data-testid="namespace-combobox"
         value={namespace}

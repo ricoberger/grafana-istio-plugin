@@ -22,14 +22,14 @@ export function VariableQueryEditor({
   onChange,
   onRunQuery,
 }: Props) {
-  const [input, setInput] = useState<string>(
+  const [graphType, setGraphType] = useState<string>(
     query.application ? 'application' : query.workload ? 'workload' : '',
   );
 
   return (
     <>
       <InlineFieldRow>
-        <InlineField label="Type">
+        <InlineField label="Variable Type" labelWidth={25}>
           <Combobox<QueryType>
             value={query.queryType}
             options={[
@@ -64,85 +64,101 @@ export function VariableQueryEditor({
       {(query.queryType === 'applications' ||
         query.queryType === 'workloads' ||
         query.queryType === 'filters') && (
-          <InlineFieldRow>
-            <NamespaceField
-              datasource={datasource}
-              range={range}
-              namespace={query.namespace}
-              onNamespaceChange={(namespace) => {
-                onChange({
-                  ...query,
-                  namespace: namespace,
-                  application: '',
-                  workload: '',
-                });
-                onRunQuery();
-              }}
-            />
+          <>
+            <InlineFieldRow>
+              <NamespaceField
+                datasource={datasource}
+                range={range}
+                namespace={query.namespace}
+                onNamespaceChange={(namespace) => {
+                  onChange({
+                    ...query,
+                    namespace: namespace,
+                    application: '',
+                    workload: '',
+                  });
+                  onRunQuery();
+                }}
+              />
+            </InlineFieldRow>
 
             {query.queryType === 'filters' && (
               <>
-                <InlineField label="Type">
-                  <RadioButtonGroup<string>
-                    options={[
-                      { label: 'Source', value: 'source' },
-                      { label: 'Destination', value: 'destination' },
-                    ]}
-                    value={query.type || ''}
-                    onChange={(value: string) => {
-                      if (value === 'destination' || value === 'source') {
-                        onChange({
-                          ...query,
-                          type: value,
-                        });
-                        onRunQuery();
-                      }
-                    }}
-                  />
-                </InlineField>
-                <InlineField label="Input Type">
-                  <RadioButtonGroup<string>
-                    options={[
-                      { label: 'Application', value: 'application' },
-                      { label: 'Workload', value: 'workload' },
-                    ]}
-                    value={input || ''}
-                    onChange={(value: string) => {
-                      setInput(value);
-                    }}
-                  />
-                </InlineField>
-                {(input === 'application' || input === 'workload') && (
-                  <InlineField label="Input" interactive>
-                    <Input
-                      onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                        if (input === 'application') {
+                <InlineFieldRow>
+                  <InlineField label="Filter Type" labelWidth={25}>
+                    <RadioButtonGroup<string>
+                      options={[
+                        { label: 'Source', value: 'source' },
+                        { label: 'Destination', value: 'destination' },
+                      ]}
+                      value={query.filterType || ''}
+                      onChange={(value: string) => {
+                        if (value === 'destination' || value === 'source') {
                           onChange({
                             ...query,
-                            application: event.target.value,
-                            workload: '',
+                            filterType: value,
                           });
-                        } else if (input === 'workload') {
-                          onChange({
-                            ...query,
-                            application: '',
-                            workload: event.target.value,
-                          });
+                          onRunQuery();
                         }
                       }}
-                      value={
-                        input === 'application'
-                          ? query.application
-                          : input === 'workload'
-                            ? query.workload
-                            : ''
-                      }
                     />
                   </InlineField>
-                )}
+                </InlineFieldRow>
+                <InlineFieldRow>
+                  <InlineField label="Graph Type" labelWidth={25}>
+                    <RadioButtonGroup<string>
+                      options={[
+                        { label: 'Application Graph', value: 'application' },
+                        { label: 'Workload Graph', value: 'workload' },
+                      ]}
+                      value={graphType || ''}
+                      onChange={(value: string) => {
+                        setGraphType(value);
+                      }}
+                    />
+                  </InlineField>
+                  {(graphType === 'application' || graphType === 'workload') && (
+                    <InlineField
+                      label={
+                        graphType === 'application'
+                          ? 'Application'
+                          : graphType === 'workload'
+                            ? 'Workload'
+                            : ''
+                      }
+                      labelWidth={25}
+                      interactive
+                    >
+                      <Input
+                        onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                          if (graphType === 'application') {
+                            onChange({
+                              ...query,
+                              application: event.target.value,
+                              workload: '',
+                            });
+                          } else if (graphType === 'workload') {
+                            onChange({
+                              ...query,
+                              application: '',
+                              workload: event.target.value,
+                            });
+                          }
+                        }}
+                        value={
+                          graphType === 'application'
+                            ? query.application
+                            : graphType === 'workload'
+                              ? query.workload
+                              : ''
+                        }
+                      />
+                    </InlineField>
+                  )}
+                </InlineFieldRow>
               </>
             )}
-          </InlineFieldRow>
+          </>
         )}
     </>
   );
