@@ -44,7 +44,7 @@ export function FiltersField({
     );
 
     const workloads = result.map((value) => {
-      return { value: value.text };
+      return { label: value.text, value: value.text };
     });
     return workloads;
   }, [datasource, namespace]);
