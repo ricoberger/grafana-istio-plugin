@@ -1,12 +1,12 @@
-import React, { ChangeEvent } from 'react';
+import React, { ChangeEvent, useState } from 'react';
 import {
+  Collapse,
   Combobox,
   ComboboxOption,
   InlineField,
   InlineFieldRow,
   InlineSwitch,
   MultiCombobox,
-  Stack,
 } from '@grafana/ui';
 import { QueryEditorProps } from '@grafana/data';
 
@@ -26,10 +26,12 @@ export function QueryEditor({
   onChange,
   onRunQuery,
 }: Props) {
+  const [graphOptionsIsOpen, setGraphOptionsIsOpen] = useState(false);
+
   return (
-    <Stack direction="column">
+    <>
       <InlineFieldRow>
-        <InlineField label="Graph">
+        <InlineField label="Graph Type" labelWidth={25}>
           <Combobox<QueryType>
             value={query.queryType}
             options={[
@@ -50,7 +52,9 @@ export function QueryEditor({
             }}
           />
         </InlineField>
+      </InlineFieldRow>
 
+      <InlineFieldRow>
         <NamespaceField
           datasource={datasource}
           range={range}
@@ -93,83 +97,90 @@ export function QueryEditor({
         )}
       </InlineFieldRow>
 
-      <InlineFieldRow>
-        <InlineField label="Metrics">
-          <MultiCombobox
-            data-testid="metrics-combobox"
-            width="auto"
-            minWidth={32}
-            maxWidth={32}
-            isClearable={true}
-            value={query.metrics}
-            options={[
-              { label: 'gRPC Requests', value: 'grpcRequests' },
-              {
-                label: 'gRPC Request Duration',
-                value: 'grpcRequestDuration',
-              },
-              { label: 'gRPC Sent Messages', value: 'grpcSentMessages' },
-              {
-                label: 'gRPC Received Messages',
-                value: 'grpcReceivedMessages',
-              },
-              { label: 'HTTP Requests', value: 'httpRequests' },
-              {
-                label: 'HTTP RequestDuration',
-                value: 'httpRequestDuration',
-              },
-              { label: 'TCP Sent Bytes', value: 'tcpSentBytes' },
-              { label: 'TCP Received Bytes', value: 'tcpReceivedBytes' },
-            ]}
-            onChange={(option: Array<ComboboxOption<string>>) => {
-              onChange({
-                ...query,
-                metrics: Array.from(option.values()).map(
-                  (value) => value.value,
-                ),
-              });
+      <Collapse
+        label="Graph Options"
+        isOpen={graphOptionsIsOpen}
+        onToggle={() => setGraphOptionsIsOpen(!graphOptionsIsOpen)}
+      >
+        <InlineFieldRow>
+          <InlineField label="Metrics" labelWidth={25}>
+            <MultiCombobox
+              data-testid="metrics-combobox"
+              width="auto"
+              minWidth={32}
+              maxWidth={32}
+              isClearable={true}
+              value={query.metrics}
+              options={[
+                { label: 'gRPC Requests', value: 'grpcRequests' },
+                {
+                  label: 'gRPC Request Duration',
+                  value: 'grpcRequestDuration',
+                },
+                { label: 'gRPC Sent Messages', value: 'grpcSentMessages' },
+                {
+                  label: 'gRPC Received Messages',
+                  value: 'grpcReceivedMessages',
+                },
+                { label: 'HTTP Requests', value: 'httpRequests' },
+                {
+                  label: 'HTTP RequestDuration',
+                  value: 'httpRequestDuration',
+                },
+                { label: 'TCP Sent Bytes', value: 'tcpSentBytes' },
+                { label: 'TCP Received Bytes', value: 'tcpReceivedBytes' },
+              ]}
+              onChange={(option: Array<ComboboxOption<string>>) => {
+                onChange({
+                  ...query,
+                  metrics: Array.from(option.values()).map(
+                    (value) => value.value,
+                  ),
+                });
+              }}
+            />
+          </InlineField>
+        </InlineFieldRow>
+
+        <InlineFieldRow>
+          <InlineField label="Idle Edges" labelWidth={25}>
+            <InlineSwitch
+              value={query.idleEdges || false}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                onChange({ ...query, idleEdges: event.target.checked });
+              }}
+            />
+          </InlineField>
+        </InlineFieldRow>
+
+        <InlineFieldRow>
+          <FiltersField
+            datasource={datasource}
+            range={range}
+            filterType="source"
+            namespace={query.namespace}
+            application={query.application}
+            workload={query.workload}
+            filters={query.sourceFilters}
+            onFiltersChange={(filters) => {
+              onChange({ ...query, sourceFilters: filters });
             }}
           />
-        </InlineField>
 
-        <InlineField label="Idle Edges">
-          <InlineSwitch
-            value={query.idleEdges || false}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              onChange({ ...query, idleEdges: event.target.checked });
-              onRunQuery();
+          <FiltersField
+            datasource={datasource}
+            range={range}
+            filterType="destination"
+            namespace={query.namespace}
+            application={query.application}
+            workload={query.workload}
+            filters={query.destinationFilters}
+            onFiltersChange={(filters) => {
+              onChange({ ...query, destinationFilters: filters });
             }}
           />
-        </InlineField>
-
-        <FiltersField
-          datasource={datasource}
-          range={range}
-          filterType="source"
-          namespace={query.namespace}
-          application={query.application}
-          workload={query.workload}
-          filters={query.sourceFilters}
-          onFiltersChange={(filters) => {
-            onChange({ ...query, sourceFilters: filters });
-            onRunQuery();
-          }}
-        />
-
-        <FiltersField
-          datasource={datasource}
-          range={range}
-          filterType="destination"
-          namespace={query.namespace}
-          application={query.application}
-          workload={query.workload}
-          filters={query.destinationFilters}
-          onFiltersChange={(filters) => {
-            onChange({ ...query, destinationFilters: filters });
-            onRunQuery();
-          }}
-        />
-      </InlineFieldRow>
-    </Stack>
+        </InlineFieldRow>
+      </Collapse>
+    </>
   );
 }

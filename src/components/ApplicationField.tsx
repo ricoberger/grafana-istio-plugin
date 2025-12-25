@@ -41,7 +41,7 @@ export function ApplicationField({
   }, [datasource, namespace]);
 
   return (
-    <InlineField label="Application">
+    <InlineField label="Application" labelWidth={25}>
       <Combobox<string>
         data-testid="application-combobox"
         value={application}
