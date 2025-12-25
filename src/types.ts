@@ -18,15 +18,6 @@ export const DEFAULT_QUERIES: Record<QueryType, Partial<Query>> = {
   applicationgraph: {
     namespace: '',
     application: '',
-    metrics: [
-      'grpcRequests',
-      'httpRequests',
-      'tcpSentBytes',
-      'tcpReceivedBytes',
-    ],
-  },
-  workloadgraph: {
-    namespace: '',
     workload: '',
     metrics: [
       'grpcRequests',
@@ -34,15 +25,34 @@ export const DEFAULT_QUERIES: Record<QueryType, Partial<Query>> = {
       'tcpSentBytes',
       'tcpReceivedBytes',
     ],
+    sourceFilters: [],
+    destinationFilters: [],
   },
-  namespacegraph: {
+  workloadgraph: {
     namespace: '',
+    application: '',
+    workload: '',
     metrics: [
       'grpcRequests',
       'httpRequests',
       'tcpSentBytes',
       'tcpReceivedBytes',
     ],
+    sourceFilters: [],
+    destinationFilters: [],
+  },
+  namespacegraph: {
+    namespace: '',
+    application: '',
+    workload: '',
+    metrics: [
+      'grpcRequests',
+      'httpRequests',
+      'tcpSentBytes',
+      'tcpReceivedBytes',
+    ],
+    sourceFilters: [],
+    destinationFilters: [],
   },
 };
 

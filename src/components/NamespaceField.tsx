@@ -31,7 +31,7 @@ export function NamespaceField({
       return { value: value.text };
     });
     return namespaces;
-  }, [datasource]);
+  }, [datasource, range]);
 
   return (
     <InlineField label="Namespace" labelWidth={25}>
