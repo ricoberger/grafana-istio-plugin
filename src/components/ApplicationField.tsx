@@ -38,7 +38,7 @@ export function ApplicationField({
       return { value: value.text };
     });
     return applications;
-  }, [datasource, namespace]);
+  }, [datasource, namespace, range]);
 
   return (
     <InlineField label="Application" labelWidth={25}>

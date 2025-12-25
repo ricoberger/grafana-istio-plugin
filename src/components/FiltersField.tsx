@@ -48,7 +48,7 @@ export function FiltersField({
       return { label: value.text, value: value.text };
     });
     return workloads;
-  }, [datasource, namespace]);
+  }, [datasource, namespace, application, workload, filterType, range]);
 
   return (
     <InlineField

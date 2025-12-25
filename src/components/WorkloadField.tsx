@@ -38,7 +38,7 @@ export function WorkloadField({
       return { value: value.text };
     });
     return workloads;
-  }, [datasource, namespace]);
+  }, [datasource, namespace, range]);
 
   return (
     <InlineField label="Workload" labelWidth={25}>
