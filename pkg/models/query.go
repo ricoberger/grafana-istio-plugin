@@ -30,7 +30,7 @@ type QueryModelWorkloads struct {
 }
 
 type QueryModelFilters struct {
-	Type        string `json:"type"`
+	FilterType  string `json:"filterType"`
 	Namespace   string `json:"namespace"`
 	Application string `json:"application"`
 	Workload    string `json:"workload"`

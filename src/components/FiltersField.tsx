@@ -4,11 +4,12 @@ import { useAsync } from 'react-use';
 
 import { DataSource } from '../datasource';
 import { TimeRange } from '@grafana/data';
+import { QueryModelFiltersFilterType } from '../types';
 
 interface Props {
   datasource: DataSource;
   range?: TimeRange;
-  type: 'source' | 'destination';
+  filterType: QueryModelFiltersFilterType;
   namespace?: string;
   application?: string;
   workload?: string;
@@ -19,7 +20,7 @@ interface Props {
 export function FiltersField({
   datasource,
   range,
-  type,
+  filterType,
   namespace,
   application,
   workload,
@@ -35,7 +36,7 @@ export function FiltersField({
       {
         refId: 'filters',
         queryType: 'filters',
-        type: type,
+        filterType: filterType,
         namespace: namespace,
         application: application,
         workload: workload,
@@ -51,10 +52,10 @@ export function FiltersField({
 
   return (
     <InlineField
-      label={type === 'source' ? 'Source Filters' : 'Destination Filters'}
+      label={filterType === 'source' ? 'Source Filters' : 'Destination Filters'}
     >
       <MultiCombobox
-        data-testid="filters-combobox"
+        data-testid={`${filterType}-filters-combobox`}
         width="auto"
         minWidth={32}
         maxWidth={32}

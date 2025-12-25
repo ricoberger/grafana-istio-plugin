@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 0,
+  "id": 3,
   "links": [],
   "panels": [
     {
@@ -150,9 +150,9 @@
         "options": [],
         "query": {
           "application": "",
+          "filterType": "source",
           "namespace": "${namespace}",
           "queryType": "filters",
-          "type": "source",
           "workload": "${workload}"
         },
         "refresh": 1,
@@ -186,9 +186,9 @@
         "options": [],
         "query": {
           "application": "",
+          "filterType": "destination",
           "namespace": "${namespace}",
           "queryType": "filters",
-          "type": "destination",
           "workload": "${workload}"
         },
         "refresh": 1,

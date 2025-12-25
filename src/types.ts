@@ -10,7 +10,7 @@ export const DEFAULT_QUERIES: Record<QueryType, Partial<Query>> = {
     namespace: '',
   },
   filters: {
-    type: 'source',
+    filterType: 'source',
     namespace: '',
     application: '',
     workload: '',
@@ -81,8 +81,10 @@ interface QueryModelWorkloads {
   namespace?: string;
 }
 
+export type QueryModelFiltersFilterType = 'source' | 'destination';
+
 interface QueryModelFilters {
-  type?: 'source' | 'destination';
+  filterType?: QueryModelFiltersFilterType;
   namespace?: string;
   application?: string;
   workload?: string;

@@ -164,7 +164,7 @@ func (d *Datasource) handleFilters(ctx context.Context, query concurrent.Query) 
 	var workloadLabel string
 	var queries []string
 
-	switch qm.Type {
+	switch qm.FilterType {
 	case "source":
 		namespaceLabel = "source_workload_namespace"
 		workloadLabel = "source_workload"
