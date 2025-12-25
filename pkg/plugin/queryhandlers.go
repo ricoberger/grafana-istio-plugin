@@ -669,7 +669,7 @@ func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, 
 			continue
 		}
 
-		workloadToServiceId := fmt.Sprintf("Workload: %s (%s) - Service: %s (%s)", m.Labels["source_workload"], m.Labels["source_workload_namespace"], m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
+		workloadToServiceId := fmt.Sprintf("workload-%s-%s-service-%s-%s", m.Labels["source_workload"], m.Labels["source_workload_namespace"], m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
 		workloadToServiceSource := fmt.Sprintf("Workload: %s (%s)", m.Labels["source_workload"], m.Labels["source_workload_namespace"])
 		workloadToServiceSourceType := "Workload"
 		workloadToServiceSourceName := m.Labels["source_workload"]
@@ -680,7 +680,7 @@ func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, 
 		workloadToServiceTargetNamespace := m.Labels["destination_service_namespace"]
 		workloadToServiceTargetService := m.Labels["destination_service"]
 
-		serviceToWorkloadId := fmt.Sprintf("Service: %s (%s) - Workload: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"], m.Labels["destination_workload"], m.Labels["destination_workload_namespace"])
+		serviceToWorkloadId := fmt.Sprintf("service-%s-%s-workload-%s-%s", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"], m.Labels["destination_workload"], m.Labels["destination_workload_namespace"])
 		serviceToWorkloadSource := fmt.Sprintf("Service: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
 		serviceToServiceSourceType := "Service"
 		serviceToServiceSourceName := m.Labels["destination_service_name"]
