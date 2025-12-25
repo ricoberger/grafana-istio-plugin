@@ -21,11 +21,11 @@ type Edge struct {
 	SourceType           string
 	SourceName           string
 	SourceNamespace      string
-	Target               string
-	TargetType           string
-	TargetName           string
-	TargetNamespace      string
-	TargetService        string
+	Destination          string
+	DestinationType      string
+	DestinationName      string
+	DestinationNamespace string
+	DestinationService   string
 	GRPCResponseCodes    map[string]float64
 	GRPCRequestsSuccess  float64
 	GRPCRequestsError    float64
@@ -43,7 +43,7 @@ type Edge struct {
 type EdgeField struct {
 	ID                          string
 	Source                      string
-	Target                      string
+	Destination                 string
 	MainStat                    []string
 	SecondaryStat               []string
 	Color                       string

@@ -442,7 +442,7 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 
 			d.logger.Debug("Get metric", "metric", metric, "namespace", namespace, "application", application, "workload", workload, "timeRangeFrom", timeRange.From, "timeRangeTo", timeRange.To, "interval", interval)
 
-			targetMetrics, err := d.prometheusClient.GetMetrics(ctx, metric, d.metricToPrometheusTargetsQuery(namespace, application, workload, metric, idleEdges, interval), timeRange)
+			destinationMetrics, err := d.prometheusClient.GetMetrics(ctx, metric, d.metricToPrometheusDestinationsQuery(namespace, application, workload, metric, idleEdges, interval), timeRange)
 			if err != nil {
 				d.logger.Error("Failed to get metric", "error", err.Error())
 				span.RecordError(err)
@@ -453,7 +453,7 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 				errorsMutex.Unlock()
 				return
 			}
-			d.logger.Debug("Retrieved metrics where application is target", "metric", metric, "namespace", namespace, "application", application, "workload", workload, "metrics", targetMetrics)
+			d.logger.Debug("Retrieved metrics where application is destination", "metric", metric, "namespace", namespace, "application", application, "workload", workload, "metrics", destinationMetrics)
 
 			sourceMetrics, err := d.prometheusClient.GetMetrics(ctx, metric, d.metricToPrometheusSourcesQuery(namespace, application, workload, metric, idleEdges, interval), timeRange)
 			if err != nil {
@@ -469,7 +469,7 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 			d.logger.Debug("Retrieved metrics where application is source", "metric", metric, "namespace", namespace, "application", application, "workload", workload, "metrics", sourceMetrics)
 
 			prometheusMetricsMutex.Lock()
-			prometheusMetrics = append(prometheusMetrics, targetMetrics...)
+			prometheusMetrics = append(prometheusMetrics, destinationMetrics...)
 			prometheusMetrics = append(prometheusMetrics, sourceMetrics...)
 			prometheusMetricsMutex.Unlock()
 		}(metric)
@@ -489,7 +489,7 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 	edgeFields := models.Fields{}
 	edgeIds := edgeFields.Add("id", nil, []string{})
 	edgeSources := edgeFields.Add("source", nil, []string{})
-	edgeTargets := edgeFields.Add("target", nil, []string{})
+	edgeDestinations := edgeFields.Add("target", nil, []string{})
 	edgeMainStat := edgeFields.Add("mainstat", nil, []string{}, &data.FieldConfig{DisplayName: "Traffic Rates"})
 	edgeSecondaryStat := edgeFields.Add("secondarystat", nil, []string{}, &data.FieldConfig{DisplayName: "Response Time / Throughput"})
 	edgeColors := edgeFields.Add("color", nil, []string{}, &data.FieldConfig{DisplayName: "Health"})
@@ -509,7 +509,7 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 
 		edgeIds.Append(edgeField.ID)
 		edgeSources.Append(edgeField.Source)
-		edgeTargets.Append(edgeField.Target)
+		edgeDestinations.Append(edgeField.Destination)
 		edgeMainStat.Append(strings.Join(edgeField.MainStat, " | "))
 		edgeSecondaryStat.Append(strings.Join(edgeField.SecondaryStat, " | "))
 		edgeColors.Append(edgeField.Color)
@@ -555,8 +555,8 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 		nodeField := d.getEdgeField(node, float64(interval))
 
 		nodeIds.Append(nodeField.ID)
-		nodeTitles.Append(node.TargetType)
-		nodeSubTitles.Append(fmt.Sprintf("%s (%s)", node.TargetName, node.TargetNamespace))
+		nodeTitles.Append(node.DestinationType)
+		nodeSubTitles.Append(fmt.Sprintf("%s (%s)", node.DestinationName, node.DestinationNamespace))
 		nodeMainStat.Append(strings.Join(nodeField.MainStat, " | "))
 		nodeSecondaryStat.Append(strings.Join(nodeField.SecondaryStat, " | "))
 		nodeColors.Append(nodeField.Color)
@@ -571,11 +571,11 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 		nodeDetailsTCPSentBytes.Append(nodeField.DetailsTCPSentBytes)
 		nodeDetailsTCPReceivedBytes.Append(nodeField.DetailsTCPReceivedBytes)
 
-		switch node.TargetType {
+		switch node.DestinationType {
 		case "Service":
-			nodeLink.Append(fmt.Sprintf("%s&var-service=%s&from=%d&to=%d", d.istioServiceDashboard, node.TargetService, timeRange.From.UnixMilli(), timeRange.To.UnixMilli()))
+			nodeLink.Append(fmt.Sprintf("%s&var-service=%s&from=%d&to=%d", d.istioServiceDashboard, node.DestinationService, timeRange.From.UnixMilli(), timeRange.To.UnixMilli()))
 		case "Workload":
-			nodeLink.Append(fmt.Sprintf("%s&var-namespace=%s&var-workload=%s&from=%d&to=%d", d.istioWorkloadDashboard, node.TargetNamespace, node.TargetName, timeRange.From.UnixMilli(), timeRange.To.UnixMilli()))
+			nodeLink.Append(fmt.Sprintf("%s&var-namespace=%s&var-workload=%s&from=%d&to=%d", d.istioWorkloadDashboard, node.DestinationNamespace, node.DestinationName, timeRange.From.UnixMilli(), timeRange.To.UnixMilli()))
 		default:
 			nodeLink.Append("")
 		}
@@ -591,7 +591,7 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 	return response
 }
 
-func (d *Datasource) metricToPrometheusTargetsQuery(namespace, application, workload, metric string, idleEdges bool, interval int64) string {
+func (d *Datasource) metricToPrometheusDestinationsQuery(namespace, application, workload, metric string, idleEdges bool, interval int64) string {
 	operator := "> 0"
 	if idleEdges {
 		operator = ""
@@ -674,22 +674,22 @@ func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, 
 		workloadToServiceSourceType := "Workload"
 		workloadToServiceSourceName := m.Labels["source_workload"]
 		workloadToServiceSourceNamespace := m.Labels["source_workload_namespace"]
-		workloadToServiceTarget := fmt.Sprintf("Service: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
-		workloadToServiceTargetType := "Service"
-		workloadToServiceTargetName := m.Labels["destination_service_name"]
-		workloadToServiceTargetNamespace := m.Labels["destination_service_namespace"]
-		workloadToServiceTargetService := m.Labels["destination_service"]
+		workloadToServiceDestination := fmt.Sprintf("Service: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
+		workloadToServiceDestinationType := "Service"
+		workloadToServiceDestinationName := m.Labels["destination_service_name"]
+		workloadToServiceDestinationNamespace := m.Labels["destination_service_namespace"]
+		workloadToServiceDestinationService := m.Labels["destination_service"]
 
 		serviceToWorkloadId := fmt.Sprintf("service-%s-%s-workload-%s-%s", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"], m.Labels["destination_workload"], m.Labels["destination_workload_namespace"])
 		serviceToWorkloadSource := fmt.Sprintf("Service: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
 		serviceToServiceSourceType := "Service"
 		serviceToServiceSourceName := m.Labels["destination_service_name"]
 		serviceToServiceSourceNamespace := m.Labels["destination_service_namespace"]
-		serviceToWorkloadTarget := fmt.Sprintf("Workload: %s (%s)", m.Labels["destination_workload"], m.Labels["destination_workload_namespace"])
-		serviceToServiceTargetType := "Workload"
-		serviceToServiceTargetName := m.Labels["destination_workload"]
-		serviceToServiceTargetNamespace := m.Labels["destination_workload_namespace"]
-		serviceToServiceTargetService := m.Labels["destination_service"]
+		serviceToWorkloadDestination := fmt.Sprintf("Workload: %s (%s)", m.Labels["destination_workload"], m.Labels["destination_workload_namespace"])
+		serviceToServiceDestinationType := "Workload"
+		serviceToServiceDestinationName := m.Labels["destination_workload"]
+		serviceToServiceDestinationNamespace := m.Labels["destination_workload_namespace"]
+		serviceToServiceDestinationService := m.Labels["destination_service"]
 
 		if _, ok := edges[workloadToServiceId]; !ok {
 			edges[workloadToServiceId] = models.Edge{
@@ -698,11 +698,11 @@ func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, 
 				SourceType:           workloadToServiceSourceType,
 				SourceName:           workloadToServiceSourceName,
 				SourceNamespace:      workloadToServiceSourceNamespace,
-				Target:               workloadToServiceTarget,
-				TargetType:           workloadToServiceTargetType,
-				TargetName:           workloadToServiceTargetName,
-				TargetNamespace:      workloadToServiceTargetNamespace,
-				TargetService:        workloadToServiceTargetService,
+				Destination:          workloadToServiceDestination,
+				DestinationType:      workloadToServiceDestinationType,
+				DestinationName:      workloadToServiceDestinationName,
+				DestinationNamespace: workloadToServiceDestinationNamespace,
+				DestinationService:   workloadToServiceDestinationService,
 				GRPCResponseCodes:    make(map[string]float64),
 				GRPCRequestsSuccess:  0,
 				GRPCRequestsError:    0,
@@ -725,11 +725,11 @@ func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, 
 				SourceType:           serviceToServiceSourceType,
 				SourceName:           serviceToServiceSourceName,
 				SourceNamespace:      serviceToServiceSourceNamespace,
-				Target:               serviceToWorkloadTarget,
-				TargetType:           serviceToServiceTargetType,
-				TargetName:           serviceToServiceTargetName,
-				TargetNamespace:      serviceToServiceTargetNamespace,
-				TargetService:        serviceToServiceTargetService,
+				Destination:          serviceToWorkloadDestination,
+				DestinationType:      serviceToServiceDestinationType,
+				DestinationName:      serviceToServiceDestinationName,
+				DestinationNamespace: serviceToServiceDestinationNamespace,
+				DestinationService:   serviceToServiceDestinationService,
 				GRPCResponseCodes:    make(map[string]float64),
 				GRPCRequestsSuccess:  0,
 				GRPCRequestsError:    0,
@@ -807,19 +807,19 @@ func (d *Datasource) edgesToNodes(edges []models.Edge) []models.Edge {
 	nodes := make(map[string]models.Edge)
 
 	for _, e := range edges {
-		nodeId := e.Target
-		nodeType := e.TargetType
-		nodeName := e.TargetName
-		nodeNamespace := e.TargetNamespace
-		nodeService := e.TargetService
+		nodeId := e.Destination
+		nodeType := e.DestinationType
+		nodeName := e.DestinationName
+		nodeNamespace := e.DestinationNamespace
+		nodeService := e.DestinationService
 
 		if _, ok := nodes[nodeId]; !ok {
 			nodes[nodeId] = models.Edge{
 				ID:                   nodeId,
-				TargetType:           nodeType,
-				TargetName:           nodeName,
-				TargetNamespace:      nodeNamespace,
-				TargetService:        nodeService,
+				DestinationType:      nodeType,
+				DestinationName:      nodeName,
+				DestinationNamespace: nodeNamespace,
+				DestinationService:   nodeService,
 				GRPCResponseCodes:    make(map[string]float64),
 				GRPCRequestsSuccess:  0,
 				GRPCRequestsError:    0,
@@ -880,9 +880,9 @@ func (d *Datasource) edgesToNodes(edges []models.Edge) []models.Edge {
 			sourceIds[nodeId] = true
 			nodes[nodeId] = models.Edge{
 				ID:                   nodeId,
-				TargetType:           nodeType,
-				TargetName:           nodeName,
-				TargetNamespace:      nodeNamespace,
+				DestinationType:      nodeType,
+				DestinationName:      nodeName,
+				DestinationNamespace: nodeNamespace,
 				GRPCResponseCodes:    make(map[string]float64),
 				GRPCRequestsSuccess:  0,
 				GRPCRequestsError:    0,
@@ -936,7 +936,7 @@ func (d *Datasource) getEdgeField(edge models.Edge, interval float64) models.Edg
 	edgeField := models.EdgeField{}
 	edgeField.ID = edge.ID
 	edgeField.Source = edge.Source
-	edgeField.Target = edge.Target
+	edgeField.Destination = edge.Destination
 
 	var grpcErrRate float64
 	var httpErrRate float64
