@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.2.0](https://github.com/ricoberger/grafana-istio-plugin/tree/v0.2.0) (2025-12-27)
+
+[Full Changelog](https://github.com/ricoberger/grafana-istio-plugin/compare/v0.1.0...v0.2.0)
+
+- Adjust Readme [\#19](https://github.com/ricoberger/grafana-istio-plugin/pull/19) ([ricoberger](https://github.com/ricoberger))
+- Adjust Logic how Graphs are Generated [\#18](https://github.com/ricoberger/grafana-istio-plugin/pull/18) ([ricoberger](https://github.com/ricoberger))
+- Adjust Naming to use Istio Terminology [\#17](https://github.com/ricoberger/grafana-istio-plugin/pull/17) ([ricoberger](https://github.com/ricoberger))
+- Fix Combobox Options Queries [\#16](https://github.com/ricoberger/grafana-istio-plugin/pull/16) ([ricoberger](https://github.com/ricoberger))
+- Improve Query Editor Layout [\#15](https://github.com/ricoberger/grafana-istio-plugin/pull/15) ([ricoberger](https://github.com/ricoberger))
+- Improve Variable Query Editor [\#14](https://github.com/ricoberger/grafana-istio-plugin/pull/14) ([ricoberger](https://github.com/ricoberger))
+- Fix Filters Combobox [\#13](https://github.com/ricoberger/grafana-istio-plugin/pull/13) ([ricoberger](https://github.com/ricoberger))
+- Fix Edge Ids [\#12](https://github.com/ricoberger/grafana-istio-plugin/pull/12) ([ricoberger](https://github.com/ricoberger))
+- Fix Query Filter for Namespace Graph [\#11](https://github.com/ricoberger/grafana-istio-plugin/pull/11) ([ricoberger](https://github.com/ricoberger))
+- Add Variable Query Editor [\#10](https://github.com/ricoberger/grafana-istio-plugin/pull/10) ([ricoberger](https://github.com/ricoberger))
+- Add Options to Filter Sources and Destinations [\#9](https://github.com/ricoberger/grafana-istio-plugin/pull/9) ([ricoberger](https://github.com/ricoberger))
+- Keep Shared Options when Graph Type is Changed [\#8](https://github.com/ricoberger/grafana-istio-plugin/pull/8) ([ricoberger](https://github.com/ricoberger))
+- Add Namespace Graph [\#7](https://github.com/ricoberger/grafana-istio-plugin/pull/7) ([ricoberger](https://github.com/ricoberger))
+- Add Workload Graph [\#6](https://github.com/ricoberger/grafana-istio-plugin/pull/6) ([ricoberger](https://github.com/ricoberger))
+
 ## [v0.1.0](https://github.com/ricoberger/grafana-istio-plugin/tree/v0.1.0) (2025-12-22)
 
 [Full Changelog](https://github.com/ricoberger/grafana-istio-plugin/compare/5962d4895c46a8af2b587742caf70f30ddc156f2...v0.1.0)
