@@ -40,21 +40,49 @@ type Edge struct {
 	TCPReceivedBytes     float64
 }
 
-type EdgeField struct {
+type Node struct {
+	ID                         string
+	Type                       string
+	Name                       string
+	Namespace                  string
+	Service                    string
+	ClientGRPCResponseCodes    map[string]float64
+	ClientGRPCRequestsSuccess  float64
+	ClientGRPCRequestsError    float64
+	ClientGRPCSentMessages     float64
+	ClientGRPCReceivedMessages float64
+	ClientHTTPResponseCodes    map[string]float64
+	ClientHTTPRequestsSuccess  float64
+	ClientHTTPRequestsError    float64
+	ClientTCPSentBytes         float64
+	ClientTCPReceivedBytes     float64
+	ServerGRPCResponseCodes    map[string]float64
+	ServerGRPCRequestsSuccess  float64
+	ServerGRPCRequestsError    float64
+	ServerGRPCSentMessages     float64
+	ServerGRPCReceivedMessages float64
+	ServerHTTPResponseCodes    map[string]float64
+	ServerHTTPRequestsSuccess  float64
+	ServerHTTPRequestsError    float64
+	ServerTCPSentBytes         float64
+	ServerTCPReceivedBytes     float64
+}
+
+type Field struct {
 	ID                          string
 	Source                      string
 	Destination                 string
 	MainStat                    []string
 	SecondaryStat               []string
 	Color                       string
-	DetailsGRPCRate             string
-	DetailsGRPCErr              string
-	DetailsGRPCDuration         string
-	DetailsGRPCSentMessages     string
-	DetailsGRPCReceivedMessages string
-	DetailsHTTPRate             string
-	DetailsHTTPErr              string
-	DetailsHTTPDuration         string
-	DetailsTCPSentBytes         string
-	DetailsTCPReceivedBytes     string
+	DetailsGRPCRate             []string
+	DetailsGRPCErr              []string
+	DetailsGRPCDuration         []string
+	DetailsGRPCSentMessages     []string
+	DetailsGRPCReceivedMessages []string
+	DetailsHTTPRate             []string
+	DetailsHTTPErr              []string
+	DetailsHTTPDuration         []string
+	DetailsTCPSentBytes         []string
+	DetailsTCPReceivedBytes     []string
 }
