@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -421,6 +422,10 @@ func (d *Datasource) handleNamespaceGraph(ctx context.Context, query concurrent.
 	return d.handleGraph(ctx, qm.Namespace, "", "", qm.Metrics, qm.SourceFilters, qm.DestinationFilters, qm.IdleEdges, query.DataQuery.TimeRange)
 }
 
+// handleGraph creates the graph for the given namespace, application or
+// workload. The function can be used for all the three graph types we support.
+// It retrieves all the requested metrics, generates the edges and nodes based
+// on the metrics and returns the graph as data frames.
 func (d *Datasource) handleGraph(ctx context.Context, namespace, application, workload string, metrics, sourceFilters, destinationFilters []string, idleEdges bool, timeRange backend.TimeRange) backend.DataResponse {
 	ctx, span := tracing.DefaultTracer().Start(ctx, "handleGraph")
 	defer span.End()
@@ -436,6 +441,9 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 	var metricsWG sync.WaitGroup
 	metricsWG.Add(len(metrics))
 
+	// Get all metrics in parallel for the given namespace, application or
+	// workload. We need to get the metrics where the namespace / application /
+	// workload is the detination orthe source to build the full graph.
 	for _, metric := range metrics {
 		go func(metric string) {
 			defer metricsWG.Done()
@@ -483,15 +491,22 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 		return backend.ErrorResponseWithErrorSource(errors[0])
 	}
 
+	// Deduplicate the metrics (metrics where all labels are the same), generate
+	// the edges based on the metrics and then generate the nodes based on the
+	// edges.
+	prometheusMetrics = d.deduplicateMetrics(prometheusMetrics)
 	edges := d.metricsToEdges(prometheusMetrics, sourceFilters, destinationFilters)
 	nodes := d.edgesToNodes(edges)
 
+	// Generate the data frames for the edges and nodes, the data for the
+	// "details__*" fields is generated using the "getEdgeField" and
+	// "getNodeField" functions.
 	edgeFields := models.Fields{}
 	edgeIds := edgeFields.Add("id", nil, []string{})
 	edgeSources := edgeFields.Add("source", nil, []string{})
 	edgeDestinations := edgeFields.Add("target", nil, []string{})
-	edgeMainStat := edgeFields.Add("mainstat", nil, []string{}, &data.FieldConfig{DisplayName: "Traffic Rates"})
-	edgeSecondaryStat := edgeFields.Add("secondarystat", nil, []string{}, &data.FieldConfig{DisplayName: "Response Time / Throughput"})
+	edgeMainStat := edgeFields.Add("mainstat", nil, []string{}, &data.FieldConfig{DisplayName: "Main Stats"})
+	edgeSecondaryStat := edgeFields.Add("secondarystat", nil, []string{}, &data.FieldConfig{DisplayName: "Secondary Stats"})
 	edgeColors := edgeFields.Add("color", nil, []string{}, &data.FieldConfig{DisplayName: "Health"})
 	edgeDetailsGRPCRate := edgeFields.Add("detail__grpcrate", nil, []string{}, &data.FieldConfig{DisplayName: "gRPC Rate"})
 	edgeDetailsGRPCErr := edgeFields.Add("detail__grpcperr", nil, []string{}, &data.FieldConfig{DisplayName: "gRPC Error"})
@@ -513,33 +528,31 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 		edgeMainStat.Append(strings.Join(edgeField.MainStat, " | "))
 		edgeSecondaryStat.Append(strings.Join(edgeField.SecondaryStat, " | "))
 		edgeColors.Append(edgeField.Color)
-		edgeDetailsGRPCRate.Append(edgeField.DetailsGRPCRate)
-		edgeDetailsGRPCErr.Append(edgeField.DetailsGRPCErr)
-		edgeDetailsGRPCDuration.Append(edgeField.DetailsGRPCDuration)
-		edgeDetailsGRPCSentMessages.Append(edgeField.DetailsGRPCSentMessages)
-		edgeDetailsGRPCReceivedMessages.Append(edgeField.DetailsGRPCReceivedMessages)
-		edgeDetailsHTTPRate.Append(edgeField.DetailsHTTPRate)
-		edgeDetailsHTTPErr.Append(edgeField.DetailsHTTPErr)
-		edgeDetailsHTTPDuration.Append(edgeField.DetailsHTTPDuration)
-		edgeDetailsTCPSentBytes.Append(edgeField.DetailsTCPSentBytes)
-		edgeDetailsTCPReceivedBytes.Append(edgeField.DetailsTCPReceivedBytes)
+		edgeDetailsGRPCRate.Append(strings.Join(edgeField.DetailsGRPCRate, " | "))
+		edgeDetailsGRPCErr.Append(strings.Join(edgeField.DetailsGRPCErr, " | "))
+		edgeDetailsGRPCDuration.Append(strings.Join(edgeField.DetailsGRPCDuration, " | "))
+		edgeDetailsGRPCSentMessages.Append(strings.Join(edgeField.DetailsGRPCSentMessages, " | "))
+		edgeDetailsGRPCReceivedMessages.Append(strings.Join(edgeField.DetailsGRPCReceivedMessages, " | "))
+		edgeDetailsHTTPRate.Append(strings.Join(edgeField.DetailsHTTPRate, " | "))
+		edgeDetailsHTTPErr.Append(strings.Join(edgeField.DetailsHTTPErr, " | "))
+		edgeDetailsHTTPDuration.Append(strings.Join(edgeField.DetailsHTTPDuration, " | "))
+		edgeDetailsTCPSentBytes.Append(strings.Join(edgeField.DetailsTCPSentBytes, " | "))
+		edgeDetailsTCPReceivedBytes.Append(strings.Join(edgeField.DetailsTCPReceivedBytes, " | "))
 	}
 
 	nodeFields := models.Fields{}
 	nodeIds := nodeFields.Add("id", nil, []string{})
 	nodeTitles := nodeFields.Add("title", nil, []string{}, &data.FieldConfig{DisplayName: "Type"})
 	nodeSubTitles := nodeFields.Add("subtitle", nil, []string{}, &data.FieldConfig{DisplayName: "Name (Namespace)"})
-	nodeMainStat := nodeFields.Add("mainstat", nil, []string{}, &data.FieldConfig{DisplayName: "Traffic Rates"})
-	nodeSecondaryStat := nodeFields.Add("secondarystat", nil, []string{}, &data.FieldConfig{DisplayName: "Response Time / Throughput"})
+	nodeMainStat := nodeFields.Add("mainstat", nil, []string{}, &data.FieldConfig{DisplayName: "Main Stats"})
+	nodeSecondaryStat := nodeFields.Add("secondarystat", nil, []string{}, &data.FieldConfig{DisplayName: "Secondary Stats"})
 	nodeColors := nodeFields.Add("color", nil, []string{}, &data.FieldConfig{DisplayName: "Health"})
 	nodeDetailsGRPCRate := nodeFields.Add("detail__grpcrate", nil, []string{}, &data.FieldConfig{DisplayName: "gRPC Rate"})
 	nodeDetailsGRPCErr := nodeFields.Add("detail__grpcperr", nil, []string{}, &data.FieldConfig{DisplayName: "gRPC Error"})
-	nodeDetailsGRPCDuration := nodeFields.Add("detail__grpcduration", nil, []string{}, &data.FieldConfig{DisplayName: "gRPC Duration"})
 	nodeDetailsGRPCSentMessages := nodeFields.Add("detail__grpcsentmessages", nil, []string{}, &data.FieldConfig{DisplayName: "gRPC Sent Messages"})
 	nodeDetailsGRPCReceivedMessages := nodeFields.Add("detail__grpcreceivedmessages", nil, []string{}, &data.FieldConfig{DisplayName: "gRPC Received Messages"})
 	nodeDetailsHTTPRate := nodeFields.Add("detail__httprate", nil, []string{}, &data.FieldConfig{DisplayName: "HTTP Rate"})
 	nodeDetailsHTTPErr := nodeFields.Add("detail__httperr", nil, []string{}, &data.FieldConfig{DisplayName: "HTTP Error"})
-	nodeDetailsHTTPDuration := nodeFields.Add("detail__httpduration", nil, []string{}, &data.FieldConfig{DisplayName: "HTTP Duration"})
 	nodeDetailsTCPSentBytes := nodeFields.Add("detail__tcpsentbytes", nil, []string{}, &data.FieldConfig{DisplayName: "TCP Sent"})
 	nodeDetailsTCPReceivedBytes := nodeFields.Add("detail__tcpreceivedbytes", nil, []string{}, &data.FieldConfig{DisplayName: "TCP Received"})
 	nodeLink := nodeFields.Add("link", nil, []string{}, &data.FieldConfig{
@@ -552,35 +565,40 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 	})
 
 	for _, node := range nodes {
-		nodeField := d.getEdgeField(node, float64(interval))
+		nodeField := d.getNodeField(node, float64(interval))
 
 		nodeIds.Append(nodeField.ID)
-		nodeTitles.Append(node.DestinationType)
-		nodeSubTitles.Append(fmt.Sprintf("%s (%s)", node.DestinationName, node.DestinationNamespace))
+		nodeTitles.Append(node.Type)
+		nodeSubTitles.Append(fmt.Sprintf("%s (%s)", node.Name, node.Namespace))
 		nodeMainStat.Append(strings.Join(nodeField.MainStat, " | "))
 		nodeSecondaryStat.Append(strings.Join(nodeField.SecondaryStat, " | "))
 		nodeColors.Append(nodeField.Color)
-		nodeDetailsGRPCRate.Append(nodeField.DetailsGRPCRate)
-		nodeDetailsGRPCErr.Append(nodeField.DetailsGRPCErr)
-		nodeDetailsGRPCDuration.Append(nodeField.DetailsGRPCDuration)
-		nodeDetailsGRPCSentMessages.Append(nodeField.DetailsGRPCSentMessages)
-		nodeDetailsGRPCReceivedMessages.Append(nodeField.DetailsGRPCReceivedMessages)
-		nodeDetailsHTTPRate.Append(nodeField.DetailsHTTPRate)
-		nodeDetailsHTTPErr.Append(nodeField.DetailsHTTPErr)
-		nodeDetailsHTTPDuration.Append(nodeField.DetailsHTTPDuration)
-		nodeDetailsTCPSentBytes.Append(nodeField.DetailsTCPSentBytes)
-		nodeDetailsTCPReceivedBytes.Append(nodeField.DetailsTCPReceivedBytes)
+		nodeDetailsGRPCRate.Append(strings.Join(nodeField.DetailsGRPCRate, " | "))
+		nodeDetailsGRPCErr.Append(strings.Join(nodeField.DetailsGRPCErr, " | "))
+		nodeDetailsGRPCSentMessages.Append(strings.Join(nodeField.DetailsGRPCSentMessages, " | "))
+		nodeDetailsGRPCReceivedMessages.Append(strings.Join(nodeField.DetailsGRPCReceivedMessages, " | "))
+		nodeDetailsHTTPRate.Append(strings.Join(nodeField.DetailsHTTPRate, " | "))
+		nodeDetailsHTTPErr.Append(strings.Join(nodeField.DetailsHTTPErr, " | "))
+		nodeDetailsTCPSentBytes.Append(strings.Join(nodeField.DetailsTCPSentBytes, " | "))
+		nodeDetailsTCPReceivedBytes.Append(strings.Join(nodeField.DetailsTCPReceivedBytes, " | "))
 
-		switch node.DestinationType {
+		// Depending on the node type we link to the appropriate Istio dashboard
+		// with the correct variables set.
+		// - Service dashboard: https://grafana.com/grafana/dashboards/7636-istio-service-dashboard/
+		// - Workload dashboard: https://grafana.com/grafana/dashboards/7630-istio-workload-dashboard/
+		switch node.Type {
 		case "Service":
-			nodeLink.Append(fmt.Sprintf("%s&var-service=%s&from=%d&to=%d", d.istioServiceDashboard, node.DestinationService, timeRange.From.UnixMilli(), timeRange.To.UnixMilli()))
+			nodeLink.Append(fmt.Sprintf("%s&var-service=%s&from=%d&to=%d", d.istioServiceDashboard, node.Service, timeRange.From.UnixMilli(), timeRange.To.UnixMilli()))
 		case "Workload":
-			nodeLink.Append(fmt.Sprintf("%s&var-namespace=%s&var-workload=%s&from=%d&to=%d", d.istioWorkloadDashboard, node.DestinationNamespace, node.DestinationName, timeRange.From.UnixMilli(), timeRange.To.UnixMilli()))
+			nodeLink.Append(fmt.Sprintf("%s&var-namespace=%s&var-workload=%s&from=%d&to=%d", d.istioWorkloadDashboard, node.Namespace, node.Name, timeRange.From.UnixMilli(), timeRange.To.UnixMilli()))
 		default:
 			nodeLink.Append("")
 		}
 	}
 
+	// Generate the backend data response with the edge and node data frames.
+	// Alos set the preferred visualization to "node graph" for both frames, so
+	// that Grafana knows how to visualize them.
 	edgeFrame := data.NewFrame("edges", edgeFields...).SetMeta(&data.FrameMeta{PreferredVisualization: data.VisTypeNodeGraph})
 	nodeFrame := data.NewFrame("nodes", nodeFields...).SetMeta(&data.FrameMeta{PreferredVisualization: data.VisTypeNodeGraph})
 
@@ -591,6 +609,16 @@ func (d *Datasource) handleGraph(ctx context.Context, namespace, application, wo
 	return response
 }
 
+// metricToPrometheusDestinationsQuery generates the Prometheus query for the
+// given metric where the application or workload is the destination.
+//
+// If the "idleEdges" parameter is set to true, the query will also include
+// edges with zero traffic. Otherwise, these edges will be filtered out using a
+// "> 0" operator.
+//
+// If the "application" parameter is set, the query will filter by the
+// "destination_app" label. If the "workload" parameter is set, the query will
+// filter by the "destination_workload" label.
 func (d *Datasource) metricToPrometheusDestinationsQuery(namespace, application, workload, metric string, idleEdges bool, interval int64) string {
 	operator := "> 0"
 	if idleEdges {
@@ -608,15 +636,15 @@ func (d *Datasource) metricToPrometheusDestinationsQuery(namespace, application,
 	case models.MetricGRPCRequests:
 		return fmt.Sprintf(`sum(increase(istio_requests_total{destination_workload_namespace="%s", request_protocol="grpc" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, destinationLabel, interval, operator)
 	case models.MetricGRPCRequestDuration:
-		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{destination_workload_namespace="%s", request_protocol="grpc" %s}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)) %s`, namespace, destinationLabel, interval, operator)
+		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{destination_workload_namespace="%s", request_protocol="grpc" %s}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload)) %s`, namespace, destinationLabel, interval, operator)
 	case models.MetricGRPCSentMessages:
-		return fmt.Sprintf(`sum(increase(istio_request_messages_total{destination_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, destinationLabel, interval, operator)
+		return fmt.Sprintf(`sum(increase(istio_request_messages_total{destination_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, destinationLabel, interval, operator)
 	case models.MetricGRPCReceivedMessages:
-		return fmt.Sprintf(`sum(increase(istio_response_messages_total{destination_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, destinationLabel, interval, operator)
+		return fmt.Sprintf(`sum(increase(istio_response_messages_total{destination_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, destinationLabel, interval, operator)
 	case models.MetricHTTPRequests:
 		return fmt.Sprintf(`sum(increase(istio_requests_total{destination_workload_namespace="%s", request_protocol="http" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, response_code) %s`, namespace, destinationLabel, interval, operator)
 	case models.MetricHTTPRequestDuration:
-		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{destination_workload_namespace="%s", request_protocol="http" %s}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)) %s`, namespace, destinationLabel, interval, operator)
+		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{destination_workload_namespace="%s", request_protocol="http" %s}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload)) %s`, namespace, destinationLabel, interval, operator)
 	case models.MetricTCPSentBytes:
 		return fmt.Sprintf(`sum(increase(istio_tcp_sent_bytes_total{destination_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, destinationLabel, interval, operator)
 	case models.MetricTCPReceivedBytes:
@@ -626,6 +654,16 @@ func (d *Datasource) metricToPrometheusDestinationsQuery(namespace, application,
 	}
 }
 
+// metricToPrometheusSourcesQuery generates the Prometheus query for the given
+// metric where the application or workload is the source.
+//
+// If the "idleEdges" parameter is set to true, the query will also include
+// edges with zero traffic. Otherwise, these edges will be filtered out using a
+// "> 0" operator.
+//
+// If the "application" parameter is set, the query will filter by the
+// "source_app" label. If the "workload" parameter is set, the query will
+// filter by the "source_workload" label.
 func (d *Datasource) metricToPrometheusSourcesQuery(namespace, application, workload, metric string, idleEdges bool, interval int64) string {
 	operator := "> 0"
 	if idleEdges {
@@ -643,15 +681,15 @@ func (d *Datasource) metricToPrometheusSourcesQuery(namespace, application, work
 	case models.MetricGRPCRequests:
 		return fmt.Sprintf(`sum(increase(istio_requests_total{source_workload_namespace="%s", request_protocol="grpc" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, sourceLabel, interval, operator)
 	case models.MetricGRPCRequestDuration:
-		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{source_workload_namespace="%s", request_protocol="grpc" %s}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)) %s`, namespace, sourceLabel, interval, operator)
+		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{source_workload_namespace="%s", request_protocol="grpc" %s}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload)) %s`, namespace, sourceLabel, interval, operator)
 	case models.MetricGRPCSentMessages:
-		return fmt.Sprintf(`sum(increase(istio_request_messages_total{source_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, sourceLabel, interval, operator)
+		return fmt.Sprintf(`sum(increase(istio_request_messages_total{source_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, sourceLabel, interval, operator)
 	case models.MetricGRPCReceivedMessages:
-		return fmt.Sprintf(`sum(increase(istio_response_messages_total{source_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status) %s`, namespace, sourceLabel, interval, operator)
+		return fmt.Sprintf(`sum(increase(istio_response_messages_total{source_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, sourceLabel, interval, operator)
 	case models.MetricHTTPRequests:
 		return fmt.Sprintf(`sum(increase(istio_requests_total{source_workload_namespace="%s", request_protocol="http" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, response_code) %s`, namespace, sourceLabel, interval, operator)
 	case models.MetricHTTPRequestDuration:
-		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{source_workload_namespace="%s", request_protocol="http" %s}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload, grpc_response_status)) %s`, namespace, sourceLabel, interval, operator)
+		return fmt.Sprintf(`histogram_quantile(0.99, sum(increase(istio_request_duration_milliseconds_bucket{source_workload_namespace="%s", request_protocol="http" %s}[%ds])) by (le, destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload)) %s`, namespace, sourceLabel, interval, operator)
 	case models.MetricTCPSentBytes:
 		return fmt.Sprintf(`sum(increase(istio_tcp_sent_bytes_total{source_workload_namespace="%s" %s}[%ds])) by (destination_service, destination_service_namespace, destination_service_name, destination_workload_namespace, destination_workload, destination_version, source_workload_namespace, source_workload) %s`, namespace, sourceLabel, interval, operator)
 	case models.MetricTCPReceivedBytes:
@@ -661,7 +699,31 @@ func (d *Datasource) metricToPrometheusSourcesQuery(namespace, application, work
 	}
 }
 
-func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, destinationFilters []string) []models.Edge {
+// depuplicateMetrics removes duplicate metrics from the given slice of
+// Prometheus metrics. Two metrics are considered duplicates if they have the
+// same labels.
+func (d *Datasource) deduplicateMetrics(metrics []prometheus.Metric) []prometheus.Metric {
+	var result []prometheus.Metric
+
+	for _, m := range metrics {
+		isDuplicate := false
+		for _, r := range result {
+			if reflect.DeepEqual(m.Labels, r.Labels) {
+				isDuplicate = true
+				break
+			}
+		}
+		if !isDuplicate {
+			result = append(result, m)
+		}
+	}
+	return result
+}
+
+// Generate the edges from the given Prometheus metrics. The edges are filtered
+// based on the given source and destination filters. If a source workload or
+// destination workload matches any of the filters, the edge is skipped.
+func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, destinationFilters []string) map[string]models.Edge {
 	edges := make(map[string]models.Edge)
 
 	for _, m := range metrics {
@@ -669,40 +731,24 @@ func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, 
 			continue
 		}
 
-		workloadToServiceId := fmt.Sprintf("workload-%s-%s-service-%s-%s", m.Labels["source_workload"], m.Labels["source_workload_namespace"], m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
-		workloadToServiceSource := fmt.Sprintf("Workload: %s (%s)", m.Labels["source_workload"], m.Labels["source_workload_namespace"])
-		workloadToServiceSourceType := "Workload"
-		workloadToServiceSourceName := m.Labels["source_workload"]
-		workloadToServiceSourceNamespace := m.Labels["source_workload_namespace"]
-		workloadToServiceDestination := fmt.Sprintf("Service: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
-		workloadToServiceDestinationType := "Service"
-		workloadToServiceDestinationName := m.Labels["destination_service_name"]
-		workloadToServiceDestinationNamespace := m.Labels["destination_service_namespace"]
-		workloadToServiceDestinationService := m.Labels["destination_service"]
+		var tmpEdges []models.Edge
 
-		serviceToWorkloadId := fmt.Sprintf("service-%s-%s-workload-%s-%s", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"], m.Labels["destination_workload"], m.Labels["destination_workload_namespace"])
-		serviceToWorkloadSource := fmt.Sprintf("Service: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"])
-		serviceToServiceSourceType := "Service"
-		serviceToServiceSourceName := m.Labels["destination_service_name"]
-		serviceToServiceSourceNamespace := m.Labels["destination_service_namespace"]
-		serviceToWorkloadDestination := fmt.Sprintf("Workload: %s (%s)", m.Labels["destination_workload"], m.Labels["destination_workload_namespace"])
-		serviceToServiceDestinationType := "Workload"
-		serviceToServiceDestinationName := m.Labels["destination_workload"]
-		serviceToServiceDestinationNamespace := m.Labels["destination_workload_namespace"]
-		serviceToServiceDestinationService := m.Labels["destination_service"]
-
-		if _, ok := edges[workloadToServiceId]; !ok {
-			edges[workloadToServiceId] = models.Edge{
-				ID:                   workloadToServiceId,
-				Source:               workloadToServiceSource,
-				SourceType:           workloadToServiceSourceType,
-				SourceName:           workloadToServiceSourceName,
-				SourceNamespace:      workloadToServiceSourceNamespace,
-				Destination:          workloadToServiceDestination,
-				DestinationType:      workloadToServiceDestinationType,
-				DestinationName:      workloadToServiceDestinationName,
-				DestinationNamespace: workloadToServiceDestinationNamespace,
-				DestinationService:   workloadToServiceDestinationService,
+		// If the source or destination workload is a waypoint, create a direct
+		// edge between the source and destination workloads. Otherwise, create
+		// one edge from the source wrokload to the destination service and from
+		// the destination service to the destination workload.
+		if m.Labels["source_workload"] == "waypoint" || m.Labels["destination_workload"] == "waypoint" {
+			tmpEdges = []models.Edge{{
+				ID:                   fmt.Sprintf("workload-%s-%s-workload-%s-%s", m.Labels["source_workload"], m.Labels["source_workload_namespace"], m.Labels["destination_service_name"], m.Labels["destination_service_namespace"]),
+				Source:               fmt.Sprintf("Workload: %s (%s)", m.Labels["source_workload"], m.Labels["source_workload_namespace"]),
+				SourceType:           "Workload",
+				SourceName:           m.Labels["source_workload"],
+				SourceNamespace:      m.Labels["source_workload_namespace"],
+				Destination:          fmt.Sprintf("Workload: %s (%s)", m.Labels["destination_workload"], m.Labels["destination_workload_namespace"]),
+				DestinationType:      "Workload",
+				DestinationName:      m.Labels["destination_workload"],
+				DestinationNamespace: m.Labels["destination_workload_namespace"],
+				DestinationService:   m.Labels["destination_service"],
 				GRPCResponseCodes:    make(map[string]float64),
 				GRPCRequestsSuccess:  0,
 				GRPCRequestsError:    0,
@@ -715,21 +761,19 @@ func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, 
 				HTTPRequestDuration:  0,
 				TCPSentBytes:         0,
 				TCPReceivedBytes:     0,
-			}
-		}
-
-		if _, ok := edges[serviceToWorkloadId]; !ok {
-			edges[serviceToWorkloadId] = models.Edge{
-				ID:                   serviceToWorkloadId,
-				Source:               serviceToWorkloadSource,
-				SourceType:           serviceToServiceSourceType,
-				SourceName:           serviceToServiceSourceName,
-				SourceNamespace:      serviceToServiceSourceNamespace,
-				Destination:          serviceToWorkloadDestination,
-				DestinationType:      serviceToServiceDestinationType,
-				DestinationName:      serviceToServiceDestinationName,
-				DestinationNamespace: serviceToServiceDestinationNamespace,
-				DestinationService:   serviceToServiceDestinationService,
+			}}
+		} else {
+			tmpEdges = []models.Edge{{
+				ID:                   fmt.Sprintf("workload-%s-%s-service-%s-%s", m.Labels["source_workload"], m.Labels["source_workload_namespace"], m.Labels["destination_service_name"], m.Labels["destination_service_namespace"]),
+				Source:               fmt.Sprintf("Workload: %s (%s)", m.Labels["source_workload"], m.Labels["source_workload_namespace"]),
+				SourceType:           "Workload",
+				SourceName:           m.Labels["source_workload"],
+				SourceNamespace:      m.Labels["source_workload_namespace"],
+				Destination:          fmt.Sprintf("Service: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"]),
+				DestinationType:      "Service",
+				DestinationName:      m.Labels["destination_service_name"],
+				DestinationNamespace: m.Labels["destination_service_namespace"],
+				DestinationService:   m.Labels["destination_service"],
 				GRPCResponseCodes:    make(map[string]float64),
 				GRPCRequestsSuccess:  0,
 				GRPCRequestsError:    0,
@@ -742,291 +786,501 @@ func (d *Datasource) metricsToEdges(metrics []prometheus.Metric, sourceFilters, 
 				HTTPRequestDuration:  0,
 				TCPSentBytes:         0,
 				TCPReceivedBytes:     0,
-			}
+			}, {
+				ID:                   fmt.Sprintf("service-%s-%s-workload-%s-%s", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"], m.Labels["destination_workload"], m.Labels["destination_workload_namespace"]),
+				Source:               fmt.Sprintf("Service: %s (%s)", m.Labels["destination_service_name"], m.Labels["destination_service_namespace"]),
+				SourceType:           "Service",
+				SourceName:           m.Labels["destination_service_name"],
+				SourceNamespace:      m.Labels["destination_service_namespace"],
+				Destination:          fmt.Sprintf("Workload: %s (%s)", m.Labels["destination_workload"], m.Labels["destination_workload_namespace"]),
+				DestinationType:      "Workload",
+				DestinationName:      m.Labels["destination_workload"],
+				DestinationNamespace: m.Labels["destination_workload_namespace"],
+				DestinationService:   m.Labels["destination_service"],
+				GRPCResponseCodes:    make(map[string]float64),
+				GRPCRequestsSuccess:  0,
+				GRPCRequestsError:    0,
+				GRPCRequestDuration:  0,
+				GRPCSentMessages:     0,
+				GRPCReceivedMessages: 0,
+				HTTPResponseCodes:    make(map[string]float64),
+				HTTPRequestsSuccess:  0,
+				HTTPRequestsError:    0,
+				HTTPRequestDuration:  0,
+				TCPSentBytes:         0,
+				TCPReceivedBytes:     0,
+			}}
 		}
 
-		if workloadToService, ok := edges[workloadToServiceId]; ok {
-			if serviceToWorkloadEdge, ok := edges[serviceToWorkloadId]; ok {
+		// Go though all the temporary edges and aggregate the metrics into the
+		// final edges map. Each edge is identified by its id. If an edge
+		// with the same id already exists, we aggregate the metrics into the
+		// existing edge.
+		//
+		// Notes:
+		// - For request counts (gRPC and HTTP) we aggregate the counts based
+		//   on the response codes. We also keep track of the total success
+		//   and error counts.
+		// - A gRPC error is considered to be any response where the
+		//   "grpc_response_status" label is 2, 4, 12, 14, 14 or 15. This should
+		//   correlate to the HTTP status codes 5xx (see
+		//   https://gist.github.com/hamakn/708b9802ca845eb59f3975dbb3ae2a01).
+		// - A HTTP error is considered to be any response where the response
+		//   code starts with 5 (i.e., 5xx).
+		// - For durations we take the latest value and only set it for edges
+		//   where the destination type is "Service", because for the edges from
+		//   services to workloads the duration depends on the source workload
+		//   and I think it doesn't make sens to aggregate them.
+		for _, edge := range tmpEdges {
+			if _, ok := edges[edge.ID]; !ok {
+				edges[edge.ID] = edge
+			}
+
+			if existingEdge, ok := edges[edge.ID]; ok {
 				switch m.Labels["metric"] {
 				case models.MetricGRPCRequests:
-					workloadToService.GRPCResponseCodes[m.Labels["grpc_response_status"]] += m.Value
-					serviceToWorkloadEdge.GRPCResponseCodes[m.Labels["grpc_response_status"]] += m.Value
+					code := m.Labels["grpc_response_status"]
+					value := m.Value
+					existingEdge.GRPCResponseCodes[code] += value
+					if code == "2" || code == "4" || code == "12" || code == "13" || code == "14" || code == "15" {
+						existingEdge.GRPCRequestsError += value
+					} else {
+						existingEdge.GRPCRequestsSuccess += value
+					}
 				case models.MetricGRPCRequestDuration:
-					workloadToService.GRPCRequestDuration = (workloadToService.GRPCRequestDuration + m.Value) / 2
-					serviceToWorkloadEdge.GRPCRequestDuration = (serviceToWorkloadEdge.GRPCRequestDuration + m.Value) / 2
+					if existingEdge.DestinationType == "Service" && m.Value > 0 {
+						existingEdge.GRPCRequestDuration = m.Value
+					}
 				case models.MetricGRPCSentMessages:
-					workloadToService.GRPCSentMessages += m.Value
-					serviceToWorkloadEdge.GRPCSentMessages += m.Value
+					existingEdge.GRPCSentMessages += m.Value
 				case models.MetricGRPCReceivedMessages:
-					workloadToService.GRPCReceivedMessages += m.Value
-					serviceToWorkloadEdge.GRPCReceivedMessages += m.Value
+					existingEdge.GRPCReceivedMessages += m.Value
 				case models.MetricHTTPRequests:
-					workloadToService.HTTPResponseCodes[m.Labels["response_code"]] += m.Value
-					serviceToWorkloadEdge.HTTPResponseCodes[m.Labels["response_code"]] += m.Value
+					code := m.Labels["response_code"]
+					value := m.Value
+					existingEdge.HTTPResponseCodes[code] += value
+					if code[0] == '5' {
+						existingEdge.HTTPRequestsError += value
+					} else {
+						existingEdge.HTTPRequestsSuccess += value
+					}
 				case models.MetricHTTPRequestDuration:
-					workloadToService.HTTPRequestDuration = (workloadToService.HTTPRequestDuration + m.Value) / 2
-					serviceToWorkloadEdge.HTTPRequestDuration = (serviceToWorkloadEdge.HTTPRequestDuration + m.Value) / 2
+					if existingEdge.DestinationType == "Service" && m.Value > 0 {
+						existingEdge.HTTPRequestDuration = m.Value
+					}
 				case models.MetricTCPSentBytes:
-					workloadToService.TCPSentBytes += m.Value
-					serviceToWorkloadEdge.TCPSentBytes += m.Value
+					existingEdge.TCPSentBytes += m.Value
 				case models.MetricTCPReceivedBytes:
-					workloadToService.TCPReceivedBytes += m.Value
-					serviceToWorkloadEdge.TCPReceivedBytes += m.Value
+					existingEdge.TCPReceivedBytes += m.Value
 				}
 
-				edges[workloadToServiceId] = workloadToService
-				edges[serviceToWorkloadId] = serviceToWorkloadEdge
+				edges[edge.ID] = existingEdge
 			}
 		}
 	}
 
-	edgesSlice := make([]models.Edge, 0, len(edges))
+	return edges
+}
+
+// Generate the nodes from the given edges. The nodes are generated by going
+// through all the edges and aggregating the metrics for each node.
+func (d *Datasource) edgesToNodes(edges map[string]models.Edge) map[string]models.Node {
+	nodes := make(map[string]models.Node)
+
+	// Go through all the edges and generate a two nodes for each edge: one for
+	// the source and one for the destination.
+	//
+	// Notes:
+	// - If the node is a source, the edge metrics are added as client metrics.
+	//   If the node is a destination, the edge metrics are added as server
+	//   metrics.
+	// - We ignore the gRPC and HTTP request durations for the nodes, because
+	//   aggregating them doesn't make much sense.
 	for _, edge := range edges {
-		for code, count := range edge.GRPCResponseCodes {
-			if code == "2" || code == "4" || code == "12" || code == "13" || code == "14" || code == "15" {
-				edge.GRPCRequestsError += count
-			} else {
-				edge.GRPCRequestsSuccess += count
-			}
-		}
-		for code, count := range edge.HTTPResponseCodes {
-			if code[0] == '5' {
-				edge.HTTPRequestsError += count
-			} else {
-				edge.HTTPRequestsSuccess += count
-			}
-		}
+		tmpNodes := []models.Node{{
+			ID:                         edge.Source,
+			Type:                       edge.SourceType,
+			Name:                       edge.SourceName,
+			Namespace:                  edge.SourceNamespace,
+			Service:                    "",
+			ClientGRPCResponseCodes:    edge.GRPCResponseCodes,
+			ClientGRPCRequestsSuccess:  edge.GRPCRequestsSuccess,
+			ClientGRPCRequestsError:    edge.GRPCRequestsError,
+			ClientGRPCSentMessages:     edge.GRPCSentMessages,
+			ClientGRPCReceivedMessages: edge.GRPCReceivedMessages,
+			ClientHTTPResponseCodes:    edge.HTTPResponseCodes,
+			ClientHTTPRequestsSuccess:  edge.HTTPRequestsSuccess,
+			ClientHTTPRequestsError:    edge.HTTPRequestsError,
+			ClientTCPSentBytes:         edge.TCPSentBytes,
+			ClientTCPReceivedBytes:     edge.TCPReceivedBytes,
+			ServerGRPCResponseCodes:    make(map[string]float64),
+			ServerGRPCRequestsSuccess:  0,
+			ServerGRPCRequestsError:    0,
+			ServerGRPCSentMessages:     0,
+			ServerGRPCReceivedMessages: 0,
+			ServerHTTPResponseCodes:    make(map[string]float64),
+			ServerHTTPRequestsSuccess:  0,
+			ServerHTTPRequestsError:    0,
+			ServerTCPSentBytes:         0,
+			ServerTCPReceivedBytes:     0,
+		}, {
+			ID:                         edge.Destination,
+			Type:                       edge.DestinationType,
+			Name:                       edge.DestinationName,
+			Namespace:                  edge.DestinationNamespace,
+			Service:                    edge.DestinationService,
+			ClientGRPCResponseCodes:    make(map[string]float64),
+			ClientGRPCRequestsSuccess:  0,
+			ClientGRPCRequestsError:    0,
+			ClientGRPCSentMessages:     0,
+			ClientGRPCReceivedMessages: 0,
+			ClientHTTPResponseCodes:    make(map[string]float64),
+			ClientHTTPRequestsSuccess:  0,
+			ClientHTTPRequestsError:    0,
+			ClientTCPSentBytes:         0,
+			ClientTCPReceivedBytes:     0,
+			ServerGRPCResponseCodes:    edge.GRPCResponseCodes,
+			ServerGRPCRequestsSuccess:  edge.GRPCRequestsSuccess,
+			ServerGRPCRequestsError:    edge.GRPCRequestsError,
+			ServerGRPCSentMessages:     edge.GRPCSentMessages,
+			ServerGRPCReceivedMessages: edge.GRPCReceivedMessages,
+			ServerHTTPResponseCodes:    edge.HTTPResponseCodes,
+			ServerHTTPRequestsSuccess:  edge.HTTPRequestsSuccess,
+			ServerHTTPRequestsError:    edge.HTTPRequestsError,
+			ServerTCPSentBytes:         edge.TCPSentBytes,
+			ServerTCPReceivedBytes:     edge.TCPReceivedBytes,
+		}}
 
-		edgesSlice = append(edgesSlice, edge)
+		for _, node := range tmpNodes {
+			// If the node doesn't exist yet, add it to the nodes map and do not
+			// continue, since we do not have to aggregate the values with an
+			// existing node.
+			if _, ok := nodes[node.ID]; !ok {
+				nodes[node.ID] = node
+				continue
+			}
+
+			if existingNode, ok := nodes[node.ID]; ok {
+				for code, count := range node.ClientGRPCResponseCodes {
+					existingNode.ClientGRPCResponseCodes[code] += count
+				}
+				existingNode.ClientGRPCRequestsSuccess += node.ClientGRPCRequestsSuccess
+				existingNode.ClientGRPCRequestsError += node.ClientGRPCRequestsError
+				existingNode.ClientGRPCSentMessages += node.ClientGRPCSentMessages
+				existingNode.ClientGRPCReceivedMessages += node.ClientGRPCReceivedMessages
+				for code, count := range node.ClientHTTPResponseCodes {
+					existingNode.ClientHTTPResponseCodes[code] += count
+				}
+				existingNode.ClientHTTPRequestsSuccess += node.ClientHTTPRequestsSuccess
+				existingNode.ClientHTTPRequestsError += node.ClientHTTPRequestsError
+				existingNode.ClientTCPSentBytes += node.ClientTCPSentBytes
+				existingNode.ClientTCPReceivedBytes += node.ClientTCPReceivedBytes
+
+				for code, count := range node.ServerGRPCResponseCodes {
+					existingNode.ServerGRPCResponseCodes[code] += count
+				}
+				existingNode.ServerGRPCRequestsSuccess += node.ServerGRPCRequestsSuccess
+				existingNode.ServerGRPCRequestsError += node.ServerGRPCRequestsError
+				existingNode.ServerGRPCSentMessages += node.ServerGRPCSentMessages
+				existingNode.ServerGRPCReceivedMessages += node.ServerGRPCReceivedMessages
+				for code, count := range node.ServerHTTPResponseCodes {
+					existingNode.ServerHTTPResponseCodes[code] += count
+				}
+				existingNode.ServerHTTPRequestsSuccess += node.ServerHTTPRequestsSuccess
+				existingNode.ServerHTTPRequestsError += node.ServerHTTPRequestsError
+				existingNode.ServerTCPSentBytes += node.ServerTCPSentBytes
+				existingNode.ServerTCPReceivedBytes += node.ServerTCPReceivedBytes
+
+				nodes[node.ID] = existingNode
+			}
+		}
 	}
 
-	return edgesSlice
+	return nodes
 }
 
-func (d *Datasource) edgesToNodes(edges []models.Edge) []models.Edge {
-	nodes := make(map[string]models.Edge)
-
-	for _, e := range edges {
-		nodeId := e.Destination
-		nodeType := e.DestinationType
-		nodeName := e.DestinationName
-		nodeNamespace := e.DestinationNamespace
-		nodeService := e.DestinationService
-
-		if _, ok := nodes[nodeId]; !ok {
-			nodes[nodeId] = models.Edge{
-				ID:                   nodeId,
-				DestinationType:      nodeType,
-				DestinationName:      nodeName,
-				DestinationNamespace: nodeNamespace,
-				DestinationService:   nodeService,
-				GRPCResponseCodes:    make(map[string]float64),
-				GRPCRequestsSuccess:  0,
-				GRPCRequestsError:    0,
-				GRPCRequestDuration:  0,
-				GRPCSentMessages:     0,
-				GRPCReceivedMessages: 0,
-				HTTPResponseCodes:    make(map[string]float64),
-				HTTPRequestsSuccess:  0,
-				HTTPRequestsError:    0,
-				HTTPRequestDuration:  0,
-				TCPSentBytes:         0,
-				TCPReceivedBytes:     0,
-			}
-		}
-
-		if node, ok := nodes[nodeId]; ok {
-			for code, count := range e.GRPCResponseCodes {
-				node.GRPCResponseCodes[code] += count
-			}
-			node.GRPCRequestsSuccess += e.GRPCRequestsSuccess
-			node.GRPCRequestsError += e.GRPCRequestsError
-			if e.GRPCRequestDuration > 0 {
-				if node.GRPCRequestDuration == 0 {
-					node.GRPCRequestDuration = e.GRPCRequestDuration
-				} else {
-					node.GRPCRequestDuration = (node.GRPCRequestDuration + e.GRPCRequestDuration) / 2
-				}
-			}
-			node.GRPCSentMessages += e.GRPCSentMessages
-			node.GRPCReceivedMessages += e.GRPCReceivedMessages
-			for code, count := range e.HTTPResponseCodes {
-				node.HTTPResponseCodes[code] += count
-			}
-			node.HTTPRequestsSuccess += e.HTTPRequestsSuccess
-			node.HTTPRequestsError += e.HTTPRequestsError
-			if e.HTTPRequestDuration > 0 {
-				if node.HTTPRequestDuration == 0 {
-					node.HTTPRequestDuration = e.HTTPRequestDuration
-				} else {
-					node.HTTPRequestDuration = (node.HTTPRequestDuration + e.HTTPRequestDuration) / 2
-				}
-			}
-			node.TCPSentBytes += e.TCPSentBytes
-			node.TCPReceivedBytes += e.TCPReceivedBytes
-
-			nodes[nodeId] = node
-		}
-	}
-
-	sourceIds := make(map[string]bool)
-	for _, e := range edges {
-		nodeId := e.Source
-		nodeType := e.SourceType
-		nodeName := e.SourceName
-		nodeNamespace := e.SourceNamespace
-
-		if _, ok := nodes[nodeId]; !ok {
-			sourceIds[nodeId] = true
-			nodes[nodeId] = models.Edge{
-				ID:                   nodeId,
-				DestinationType:      nodeType,
-				DestinationName:      nodeName,
-				DestinationNamespace: nodeNamespace,
-				GRPCResponseCodes:    make(map[string]float64),
-				GRPCRequestsSuccess:  0,
-				GRPCRequestsError:    0,
-				GRPCRequestDuration:  0,
-				GRPCSentMessages:     0,
-				GRPCReceivedMessages: 0,
-				HTTPResponseCodes:    make(map[string]float64),
-				HTTPRequestsSuccess:  0,
-				HTTPRequestsError:    0,
-				HTTPRequestDuration:  0,
-				TCPSentBytes:         0,
-				TCPReceivedBytes:     0,
-			}
-		}
-
-		if _, isSource := sourceIds[nodeId]; !isSource {
-			continue
-		}
-
-		if node, ok := nodes[nodeId]; ok {
-			for code, count := range e.GRPCResponseCodes {
-				node.GRPCResponseCodes[code] += count
-			}
-			node.GRPCRequestsSuccess += e.GRPCRequestsSuccess
-			node.GRPCRequestsError += e.GRPCRequestsError
-			node.GRPCRequestDuration = (node.GRPCRequestDuration + e.GRPCRequestDuration) / 2
-			node.GRPCSentMessages += e.GRPCSentMessages
-			node.GRPCReceivedMessages += e.GRPCReceivedMessages
-			for code, count := range e.HTTPResponseCodes {
-				node.HTTPResponseCodes[code] += count
-			}
-			node.HTTPRequestsSuccess += e.HTTPRequestsSuccess
-			node.HTTPRequestsError += e.HTTPRequestsError
-			node.HTTPRequestDuration = (node.HTTPRequestDuration + e.HTTPRequestDuration) / 2
-			node.TCPSentBytes += e.TCPSentBytes
-			node.TCPReceivedBytes += e.TCPReceivedBytes
-
-			nodes[nodeId] = node
-		}
-	}
-
-	nodesSlice := make([]models.Edge, 0, len(edges))
-	for _, node := range nodes {
-		nodesSlice = append(nodesSlice, node)
-	}
-
-	return nodesSlice
-}
-
-func (d *Datasource) getEdgeField(edge models.Edge, interval float64) models.EdgeField {
-	edgeField := models.EdgeField{}
-	edgeField.ID = edge.ID
-	edgeField.Source = edge.Source
-	edgeField.Destination = edge.Destination
+// generateEdgeField generates the data frame fields for the give edge. This
+// also includes setting the color, main stat and secondary stat.
+func (d *Datasource) getEdgeField(edge models.Edge, interval float64) models.Field {
+	field := models.Field{}
+	field.ID = edge.ID
+	field.Source = edge.Source
+	field.Destination = edge.Destination
 
 	var grpcErrRate float64
 	var httpErrRate float64
 
-	if edge.GRPCRequestsSuccess+edge.GRPCRequestsError > 0 {
-		edgeField.DetailsGRPCRate = fmt.Sprintf("%.2frps", (edge.GRPCRequestsSuccess+edge.GRPCRequestsError)/interval)
-		if edge.GRPCRequestsError > 0 {
-			grpcErrRate = (edge.GRPCRequestsError / (edge.GRPCRequestsSuccess + edge.GRPCRequestsError)) * 100
-			edgeField.DetailsGRPCErr = fmt.Sprintf("%.2f%%", grpcErrRate)
-		}
+	// Set the details metrics for gRPC traffic and save the gRPC error rate
+	// for later to use them for setting the color. All metrics are set also
+	// when they are zero, except the gRPC request duration, where we use "-",
+	// because only edges from a source workload to a destination service have
+	// a duration.
+	field.DetailsGRPCRate = []string{fmt.Sprintf("%.2frps", (edge.GRPCRequestsSuccess+edge.GRPCRequestsError)/interval)}
+	if edge.GRPCRequestsError > 0 {
+		grpcErrRate = (edge.GRPCRequestsError / (edge.GRPCRequestsSuccess + edge.GRPCRequestsError)) * 100
+		field.DetailsGRPCErr = []string{fmt.Sprintf("%.2f%%", grpcErrRate)}
+	} else {
+		grpcErrRate = 0
+		field.DetailsGRPCErr = []string{fmt.Sprintf("%.2f%%", grpcErrRate)}
 	}
-
 	if edge.GRPCRequestDuration > 0 {
-		edgeField.DetailsGRPCDuration = fmt.Sprintf("%.2fms", edge.GRPCRequestDuration)
+		field.DetailsGRPCDuration = []string{fmt.Sprintf("%.2fms", edge.GRPCRequestDuration)}
+	} else {
+		field.DetailsGRPCDuration = []string{"-"}
 	}
+	field.DetailsGRPCSentMessages = []string{fmt.Sprintf("%.2fmps", edge.GRPCSentMessages/interval)}
+	field.DetailsGRPCReceivedMessages = []string{fmt.Sprintf("%.2fmps", edge.GRPCReceivedMessages/interval)}
 
-	if edge.GRPCSentMessages > 0 {
-		edgeField.DetailsGRPCSentMessages = fmt.Sprintf("%.2fmps", edge.GRPCSentMessages/interval)
+	// Set the details metrics for HTTP traffic and save the HTTP error rate
+	// for later to use them for setting the color. All metrics are set also
+	// when they are zero, except the HTTP request duration, where we use "-",
+	// because only edges from a source workload to a destination service have
+	// a duration.
+	field.DetailsHTTPRate = []string{fmt.Sprintf("%.2frps", (edge.HTTPRequestsSuccess+edge.HTTPRequestsError)/interval)}
+	if edge.HTTPRequestsError > 0 {
+		httpErrRate = (edge.HTTPRequestsError / (edge.HTTPRequestsSuccess + edge.HTTPRequestsError)) * 100
+		field.DetailsHTTPErr = []string{fmt.Sprintf("%.2f%%", httpErrRate)}
+	} else {
+		httpErrRate = 0
+		field.DetailsHTTPErr = []string{fmt.Sprintf("%.2f%%", httpErrRate)}
 	}
-
-	if edge.GRPCReceivedMessages > 0 {
-		edgeField.DetailsGRPCReceivedMessages = fmt.Sprintf("%.2fmps", edge.GRPCReceivedMessages/interval)
-	}
-
-	if edge.HTTPRequestsSuccess+edge.HTTPRequestsError > 0 {
-		edgeField.DetailsHTTPRate = fmt.Sprintf("%.2frps", (edge.HTTPRequestsSuccess+edge.HTTPRequestsError)/interval)
-		if edge.HTTPRequestsError > 0 {
-			httpErrRate = (edge.HTTPRequestsError / (edge.HTTPRequestsSuccess + edge.HTTPRequestsError)) * 100
-			edgeField.DetailsHTTPErr = fmt.Sprintf("%.2f%%", httpErrRate)
-		}
-	}
-
 	if edge.HTTPRequestDuration > 0 {
-		edgeField.DetailsHTTPDuration = fmt.Sprintf("%.2fms", edge.HTTPRequestDuration)
+		field.DetailsHTTPDuration = []string{fmt.Sprintf("%.2fms", edge.HTTPRequestDuration)}
+	} else {
+		field.DetailsHTTPDuration = []string{"-"}
 	}
 
-	if edge.TCPSentBytes > 0 {
-		edgeField.DetailsTCPSentBytes = fmt.Sprintf("%.2fbps", edge.TCPSentBytes/interval)
-	}
+	// Set the details metrics for TCP traffic.
+	field.DetailsTCPSentBytes = []string{fmt.Sprintf("%.2fbps", edge.TCPSentBytes/interval)}
+	field.DetailsTCPReceivedBytes = []string{fmt.Sprintf("%.2fbps", edge.TCPReceivedBytes/interval)}
 
-	if edge.TCPReceivedBytes > 0 {
-		edgeField.DetailsTCPReceivedBytes = fmt.Sprintf("%.2fbps", edge.TCPReceivedBytes/interval)
-	}
-
+	// Set the color, main stat and secondary stat based on the traffic type:
+	// - If there is more HTTP traffic than gRPC traffic, show the HTTP request
+	//   rate and error percentage as main stat. The secondary stat is the HTTP
+	//   request duration and the TCP traffic rate.
+	// - If there is gRPC traffic, show the gRPC request rate and error
+	//   percentage as main stat. The secondary stat is the gRPC request
+	//   duration and the TCP traffic rate.
+	// - If there is only TCP traffic, show the TCP traffic rate as main stat.
+	//
+	// The color is set as follows:
+	// - For HTTP and gRPC traffic, if the error rate is above the error
+	//   threshold, the color is red. If the error rate is above the warning
+	//   threshold, the color is yellow. Otherwise, the color is green.
+	// - For TCP traffic, the color is blue.
+	// - If there is no traffic, the color is gray.
 	if edge.HTTPRequestsSuccess+edge.HTTPRequestsError > edge.GRPCRequestsSuccess+edge.GRPCRequestsError {
-		edgeField.MainStat = append(edgeField.MainStat, edgeField.DetailsHTTPRate)
-		if edgeField.DetailsHTTPErr != "" {
-			edgeField.MainStat = append(edgeField.MainStat, edgeField.DetailsHTTPErr)
+		field.MainStat = append(field.MainStat, field.DetailsHTTPRate[0])
+		if httpErrRate > 0 {
+			field.MainStat = append(field.MainStat, field.DetailsHTTPErr[0])
 		}
 
 		if httpErrRate >= d.istioErrorThreshold {
-			edgeField.Color = "#f2495c"
+			field.Color = "#f2495c"
 		} else if httpErrRate > d.istioWarningThreshold {
-			edgeField.Color = "#fade2a"
+			field.Color = "#fade2a"
 		} else {
-			edgeField.Color = "#73bf69"
+			field.Color = "#73bf69"
 		}
 
-		if edgeField.DetailsHTTPDuration != "" {
-			edgeField.SecondaryStat = append(edgeField.SecondaryStat, edgeField.DetailsHTTPDuration)
+		if edge.HTTPRequestDuration > 0 {
+			field.SecondaryStat = append(field.SecondaryStat, field.DetailsHTTPDuration[0])
 		}
 		if edge.TCPSentBytes+edge.TCPReceivedBytes > 0 {
-			edgeField.SecondaryStat = append(edgeField.SecondaryStat, fmt.Sprintf("%.2fbps", (edge.TCPSentBytes+edge.TCPReceivedBytes)/interval))
+			field.SecondaryStat = append(field.SecondaryStat, fmt.Sprintf("%.2fbps", (edge.TCPSentBytes+edge.TCPReceivedBytes)/interval))
 		}
 	} else if edge.GRPCRequestsSuccess+edge.GRPCRequestsError > 0 {
-		edgeField.MainStat = append(edgeField.MainStat, edgeField.DetailsGRPCRate)
-		if edgeField.DetailsGRPCErr != "" {
-			edgeField.MainStat = append(edgeField.MainStat, edgeField.DetailsGRPCErr)
+		field.MainStat = append(field.MainStat, field.DetailsGRPCRate[0])
+		if grpcErrRate > 0 {
+			field.MainStat = append(field.MainStat, field.DetailsGRPCErr[0])
 		}
 
 		if grpcErrRate >= d.istioErrorThreshold {
-			edgeField.Color = "#f2495c"
+			field.Color = "#f2495c"
 		} else if grpcErrRate > d.istioWarningThreshold {
-			edgeField.Color = "#fade2a"
+			field.Color = "#fade2a"
 		} else {
-			edgeField.Color = "#73bf69"
+			field.Color = "#73bf69"
 		}
 
-		if edgeField.DetailsGRPCDuration != "" {
-			edgeField.SecondaryStat = append(edgeField.SecondaryStat, edgeField.DetailsGRPCDuration)
+		if edge.GRPCRequestDuration > 0 {
+			field.SecondaryStat = append(field.SecondaryStat, field.DetailsGRPCDuration[0])
 		}
 		if edge.TCPSentBytes+edge.TCPReceivedBytes > 0 {
-			edgeField.SecondaryStat = append(edgeField.SecondaryStat, fmt.Sprintf("%.2fbps", (edge.TCPSentBytes+edge.TCPReceivedBytes)/interval))
+			field.SecondaryStat = append(field.SecondaryStat, fmt.Sprintf("%.2fbps", (edge.TCPSentBytes+edge.TCPReceivedBytes)/interval))
 		}
 	} else if edge.TCPSentBytes+edge.TCPReceivedBytes > 0 {
-		edgeField.MainStat = append(edgeField.MainStat, fmt.Sprintf("%.2fbps", (edge.TCPSentBytes+edge.TCPReceivedBytes)/interval))
-		edgeField.Color = "#5794f2"
+		field.MainStat = append(field.MainStat, fmt.Sprintf("%.2fbps", (edge.TCPSentBytes+edge.TCPReceivedBytes)/interval))
+		field.Color = "#5794f2"
 	} else {
-		edgeField.Color = "#ccccdc"
+		field.Color = "#ccccdc"
 	}
 
-	return edgeField
+	return field
+}
+
+// generateNodeField generate the data frame fields for the given node. This
+// also includes setting the color, main stat and secondary stat.
+func (d *Datasource) getNodeField(node models.Node, interval float64) models.Field {
+	field := models.Field{}
+	field.ID = node.ID
+
+	// If the node is a service, we generate the same stats as we generate for
+	// edges, with the traffic were the node acting as a server.
+	if node.Type == "Service" {
+		return d.getEdgeField(models.Edge{
+			ID:                   node.ID,
+			Source:               node.ID,
+			Destination:          node.ID,
+			GRPCRequestsSuccess:  node.ServerGRPCRequestsSuccess,
+			GRPCRequestsError:    node.ServerGRPCRequestsError,
+			GRPCSentMessages:     node.ServerGRPCSentMessages,
+			GRPCReceivedMessages: node.ServerGRPCReceivedMessages,
+			HTTPRequestsSuccess:  node.ServerHTTPRequestsSuccess,
+			HTTPRequestsError:    node.ServerHTTPRequestsError,
+			TCPSentBytes:         node.ServerTCPSentBytes,
+			TCPReceivedBytes:     node.ServerTCPReceivedBytes,
+		}, interval)
+	}
+
+	var grpcServerErrRate float64
+	var grpcClientErrRate float64
+	var httpServerErrRate float64
+	var httpClientErrRate float64
+
+	// Set the details metrics for gRPC traffic. We always display the server
+	// traffic first and afterwards the client traffic. All metrics are set also
+	// when they are zero.
+	field.DetailsGRPCRate = []string{fmt.Sprintf("%.2frps", (node.ServerGRPCRequestsSuccess+node.ServerGRPCRequestsError)/interval), fmt.Sprintf("%.2frps", (node.ClientGRPCRequestsSuccess+node.ClientGRPCRequestsError)/interval)}
+	if node.ServerGRPCRequestsError > 0 && node.ClientGRPCRequestsError > 0 {
+		grpcServerErrRate = (node.ServerGRPCRequestsError / (node.ServerGRPCRequestsSuccess + node.ServerGRPCRequestsError)) * 100
+		grpcClientErrRate = (node.ClientGRPCRequestsError / (node.ClientGRPCRequestsSuccess + node.ClientGRPCRequestsError)) * 100
+		field.DetailsGRPCErr = []string{fmt.Sprintf("%.2f%%", grpcServerErrRate), fmt.Sprintf("%.2f%%", grpcClientErrRate)}
+	} else if node.ServerGRPCRequestsError > 0 && node.ClientGRPCRequestsError == 0 {
+		grpcServerErrRate = (node.ServerGRPCRequestsError / (node.ServerGRPCRequestsSuccess + node.ServerGRPCRequestsError)) * 100
+		grpcClientErrRate = 0
+		field.DetailsGRPCErr = []string{fmt.Sprintf("%.2f%%", grpcServerErrRate), "0.00%"}
+	} else if node.ServerGRPCRequestsError == 0 && node.ClientGRPCRequestsError > 0 {
+		grpcServerErrRate = 0
+		grpcClientErrRate = (node.ClientGRPCRequestsError / (node.ClientGRPCRequestsSuccess + node.ClientGRPCRequestsError)) * 100
+		field.DetailsGRPCErr = []string{"0.00%", fmt.Sprintf("%.2f%%", grpcClientErrRate)}
+	} else {
+		grpcServerErrRate = 0
+		grpcClientErrRate = 0
+		field.DetailsGRPCErr = []string{"0.00%", "0.00%"}
+	}
+	field.DetailsGRPCSentMessages = []string{fmt.Sprintf("%.2fmps", node.ServerGRPCSentMessages/interval), fmt.Sprintf("%.2fmps", node.ClientGRPCSentMessages/interval)}
+	field.DetailsGRPCReceivedMessages = []string{fmt.Sprintf("%.2fmps", node.ServerGRPCReceivedMessages/interval), fmt.Sprintf("%.2fmps", node.ClientGRPCReceivedMessages/interval)}
+
+	// Set the details metrics for HTTP traffic. We always display the server
+	// traffic first and afterwards the client traffic. All metrics are set also
+	// when they are zero.
+	field.DetailsHTTPRate = []string{fmt.Sprintf("%.2frps", (node.ServerHTTPRequestsSuccess+node.ServerHTTPRequestsError)/interval), fmt.Sprintf("%.2frps", (node.ClientHTTPRequestsSuccess+node.ClientHTTPRequestsError)/interval)}
+	if node.ServerHTTPRequestsError > 0 && node.ClientHTTPRequestsError > 0 {
+		httpServerErrRate = (node.ServerHTTPRequestsError / (node.ServerHTTPRequestsSuccess + node.ServerHTTPRequestsError)) * 100
+		httpClientErrRate = (node.ClientHTTPRequestsError / (node.ClientHTTPRequestsSuccess + node.ClientHTTPRequestsError)) * 100
+		field.DetailsHTTPErr = []string{fmt.Sprintf("%.2f%%", httpServerErrRate), fmt.Sprintf("%.2f%%", httpClientErrRate)}
+	} else if node.ServerHTTPRequestsError > 0 && node.ClientHTTPRequestsError == 0 {
+		httpServerErrRate = (node.ServerHTTPRequestsError / (node.ServerHTTPRequestsSuccess + node.ServerHTTPRequestsError)) * 100
+		httpClientErrRate = 0
+		field.DetailsHTTPErr = []string{fmt.Sprintf("%.2f%%", httpServerErrRate), "0.00%"}
+	} else if node.ServerHTTPRequestsError == 0 && node.ClientHTTPRequestsError > 0 {
+		httpServerErrRate = 0
+		httpClientErrRate = (node.ClientHTTPRequestsError / (node.ClientHTTPRequestsSuccess + node.ClientHTTPRequestsError)) * 100
+		field.DetailsHTTPErr = []string{"0.00%", fmt.Sprintf("%.2f%%", httpClientErrRate)}
+	} else {
+		httpServerErrRate = 0
+		httpClientErrRate = 0
+		field.DetailsHTTPErr = []string{"0.00%", "0.00%"}
+	}
+
+	// Set the details metrics for TCP traffic.
+	field.DetailsTCPSentBytes = []string{fmt.Sprintf("%.2fbps", node.ServerTCPSentBytes/interval), fmt.Sprintf("%.2fbps", node.ClientTCPSentBytes/interval)}
+	field.DetailsTCPReceivedBytes = []string{fmt.Sprintf("%.2fbps", node.ServerTCPReceivedBytes/interval), fmt.Sprintf("%.2fbps", node.ClientTCPReceivedBytes/interval)}
+
+	// Set the color, main stat and secondary stat based on the traffic type:
+	// - We always prefer server traffic over the client traffic.
+	// - We prefer the traffic type with more requests. This means if we have
+	//   more HTTP traffic then gRPC traffic we use the HTTP metrics in the
+	//   same way as we do it for edges, otherwise we use the gRPC metrics in a
+	//   similar way.
+	if node.ServerHTTPRequestsSuccess+node.ServerHTTPRequestsError > node.ServerGRPCRequestsSuccess+node.ServerGRPCRequestsError {
+		field.MainStat = append(field.MainStat, field.DetailsHTTPRate[0])
+		if httpServerErrRate > 0 {
+			field.MainStat = append(field.MainStat, field.DetailsHTTPErr[0])
+		}
+
+		if httpServerErrRate >= d.istioErrorThreshold {
+			field.Color = "#f2495c"
+		} else if httpServerErrRate > d.istioWarningThreshold {
+			field.Color = "#fade2a"
+		} else {
+			field.Color = "#73bf69"
+		}
+
+		if node.ServerTCPSentBytes+node.ServerTCPReceivedBytes > 0 {
+			field.SecondaryStat = append(field.SecondaryStat, fmt.Sprintf("%.2fbps", (node.ServerTCPSentBytes+node.ServerTCPReceivedBytes)/interval))
+		}
+	} else if node.ServerGRPCRequestsSuccess+node.ServerGRPCRequestsError > 0 {
+		field.MainStat = append(field.MainStat, field.DetailsGRPCRate[0])
+		if grpcServerErrRate > 0 {
+			field.MainStat = append(field.MainStat, field.DetailsGRPCErr[0])
+		}
+
+		if grpcServerErrRate >= d.istioErrorThreshold {
+			field.Color = "#f2495c"
+		} else if grpcServerErrRate > d.istioWarningThreshold {
+			field.Color = "#fade2a"
+		} else {
+			field.Color = "#73bf69"
+		}
+
+		if node.ServerTCPSentBytes+node.ServerTCPReceivedBytes > 0 {
+			field.SecondaryStat = append(field.SecondaryStat, fmt.Sprintf("%.2fbps", (node.ServerTCPSentBytes+node.ServerTCPReceivedBytes)/interval))
+		}
+	} else if node.ClientHTTPRequestsSuccess+node.ClientHTTPRequestsError > node.ClientGRPCRequestsSuccess+node.ClientGRPCRequestsError {
+		field.MainStat = append(field.MainStat, field.DetailsHTTPRate[1])
+		if httpClientErrRate > 0 {
+			field.MainStat = append(field.MainStat, field.DetailsHTTPErr[1])
+		}
+
+		if httpClientErrRate >= d.istioErrorThreshold {
+			field.Color = "#f2495c"
+		} else if httpClientErrRate > d.istioWarningThreshold {
+			field.Color = "#fade2a"
+		} else {
+			field.Color = "#73bf69"
+		}
+
+		if node.ClientTCPSentBytes+node.ClientTCPReceivedBytes > 0 {
+			field.SecondaryStat = append(field.SecondaryStat, fmt.Sprintf("%.2fbps", (node.ClientTCPSentBytes+node.ClientTCPReceivedBytes)/interval))
+		}
+	} else if node.ClientGRPCRequestsSuccess+node.ClientGRPCRequestsError > 0 {
+		field.MainStat = append(field.MainStat, field.DetailsGRPCRate[1])
+		if grpcClientErrRate > 0 {
+			field.MainStat = append(field.MainStat, field.DetailsGRPCErr[1])
+		}
+
+		if grpcClientErrRate >= d.istioErrorThreshold {
+			field.Color = "#f2495c"
+		} else if grpcClientErrRate > d.istioWarningThreshold {
+			field.Color = "#fade2a"
+		} else {
+			field.Color = "#73bf69"
+		}
+
+		if node.ClientTCPSentBytes+node.ClientTCPReceivedBytes > 0 {
+			field.SecondaryStat = append(field.SecondaryStat, fmt.Sprintf("%.2fbps", (node.ClientTCPSentBytes+node.ClientTCPReceivedBytes)/interval))
+		}
+	} else if node.ServerTCPSentBytes+node.ServerTCPReceivedBytes > 0 {
+		field.MainStat = append(field.MainStat, fmt.Sprintf("%.2fbps", (node.ServerTCPSentBytes+node.ServerTCPReceivedBytes)/interval))
+		field.Color = "#5794f2"
+	} else if node.ClientTCPSentBytes+node.ClientTCPReceivedBytes > 0 {
+		field.MainStat = append(field.MainStat, fmt.Sprintf("%.2fbps", (node.ClientTCPSentBytes+node.ClientTCPReceivedBytes)/interval))
+		field.Color = "#5794f2"
+	} else {
+		field.Color = "#ccccdc"
+	}
+
+	return field
 }
