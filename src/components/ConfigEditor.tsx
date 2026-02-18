@@ -88,7 +88,7 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
           <InlineField label="Password" labelWidth={25} interactive>
             <SecretInput
               required
-              isConfigured={secureJsonFields.apiKey}
+              isConfigured={secureJsonFields.prometheusPassword}
               value={secureJsonData?.prometheusPassword}
               width={40}
               onReset={() => {
@@ -122,19 +122,19 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
           <InlineField label="Bearer Token" labelWidth={25} interactive>
             <SecretInput
               required
-              isConfigured={secureJsonFields.apiKey}
-              value={secureJsonData?.prometheusPassword}
+              isConfigured={secureJsonFields.prometheusToken}
+              value={secureJsonData?.prometheusToken}
               width={40}
               onReset={() => {
                 onOptionsChange({
                   ...options,
                   secureJsonFields: {
                     ...options.secureJsonFields,
-                    prometheusPassword: false,
+                    prometheusToken: false,
                   },
                   secureJsonData: {
                     ...options.secureJsonData,
-                    prometheusPassword: '',
+                    prometheusToken: '',
                   },
                 });
               }}
@@ -142,7 +142,7 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
                 onOptionsChange({
                   ...options,
                   secureJsonData: {
-                    prometheusPassword: event.target.value,
+                    prometheusToken: event.target.value,
                   },
                 });
               }}
