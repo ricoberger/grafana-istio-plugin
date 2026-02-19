@@ -22,7 +22,8 @@ var DefaultRoundTripper http.RoundTripper = otelhttp.NewTransport(&http.Transpor
 type BasicAuthTransport struct {
 	Transport http.RoundTripper
 	Username  string
-	Password  string
+	//nolint:gosec
+	Password string
 }
 
 // RoundTrip implements the RoundTrip for our RoundTripper with basic auth support.
