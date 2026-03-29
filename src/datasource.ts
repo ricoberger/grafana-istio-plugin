@@ -1,17 +1,17 @@
 import {
-  DataFrame,
-  DataSourceInstanceSettings,
   CoreApp,
-  ScopedVars,
-  LegacyMetricFindQueryOptions,
-  MetricFindValue,
+  DataFrame,
   DataQueryRequest,
   DataQueryResponse,
+  DataSourceInstanceSettings,
+  LegacyMetricFindQueryOptions,
+  MetricFindValue,
+  ScopedVars,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { lastValueFrom, Observable } from 'rxjs';
 
-import { Query, Options, DEFAULT_QUERY } from './types';
+import { DEFAULT_QUERY, Options, Query } from './types';
 import { VariableSupport } from './variablesupport';
 
 export class DataSource extends DataSourceWithBackend<Query, Options> {

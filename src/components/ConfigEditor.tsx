@@ -1,4 +1,8 @@
-import React, { ChangeEvent } from 'react';
+import { css } from '@emotion/css';
+import {
+  DataSourcePluginOptionsEditorProps,
+  GrafanaTheme2,
+} from '@grafana/data';
 import {
   InlineField,
   Input,
@@ -6,13 +10,9 @@ import {
   SecretInput,
   useStyles2,
 } from '@grafana/ui';
-import {
-  DataSourcePluginOptionsEditorProps,
-  GrafanaTheme2,
-} from '@grafana/data';
+import React, { ChangeEvent } from 'react';
 
 import { Options, OptionsPrometheusAuthMethod, OptionsSecure } from '../types';
-import { css } from '@emotion/css';
 
 interface Props
   extends DataSourcePluginOptionsEditorProps<Options, OptionsSecure> { }

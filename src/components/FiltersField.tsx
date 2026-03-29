@@ -1,9 +1,9 @@
-import React from 'react';
+import { TimeRange } from '@grafana/data';
 import { ComboboxOption, InlineField, MultiCombobox } from '@grafana/ui';
+import React from 'react';
 import { useAsync } from 'react-use';
 
 import { DataSource } from '../datasource';
-import { TimeRange } from '@grafana/data';
 import { QueryModelFiltersFilterType } from '../types';
 
 interface Props {

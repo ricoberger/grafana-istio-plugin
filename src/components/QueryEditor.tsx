@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useState } from 'react';
+import { QueryEditorProps } from '@grafana/data';
 import {
   Collapse,
   Combobox,
@@ -8,14 +8,14 @@ import {
   InlineSwitch,
   MultiCombobox,
 } from '@grafana/ui';
-import { QueryEditorProps } from '@grafana/data';
+import React, { ChangeEvent, useState } from 'react';
 
 import { DataSource } from '../datasource';
 import { DEFAULT_QUERIES, Options, Query, QueryType } from '../types';
-import { NamespaceField } from './NamespaceField';
 import { ApplicationField } from './ApplicationField';
-import { WorkloadField } from './WorkloadField';
 import { FiltersField } from './FiltersField';
+import { NamespaceField } from './NamespaceField';
+import { WorkloadField } from './WorkloadField';
 
 type Props = QueryEditorProps<DataSource, Query, Options>;
 

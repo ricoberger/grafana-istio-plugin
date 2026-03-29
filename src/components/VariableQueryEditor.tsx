@@ -1,13 +1,13 @@
-import React, { ChangeEvent, useState } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import {
-  InlineFieldRow,
-  InlineField,
   Combobox,
   ComboboxOption,
-  RadioButtonGroup,
+  InlineField,
+  InlineFieldRow,
   Input,
+  RadioButtonGroup,
 } from '@grafana/ui';
+import React, { ChangeEvent, useState } from 'react';
 
 import { DataSource } from '../datasource';
 import { DEFAULT_QUERIES, Options, Query, QueryType } from '../types';
