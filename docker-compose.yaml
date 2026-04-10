@@ -11,13 +11,3 @@ services:
       GF_LOG_FILTERS: plugin.ricoberger-istio-datasource:debug
       GF_LOG_LEVEL: error
       PROMETHEUS_URL: ${PROMETHEUS_URL:-http://host.docker.internal:9090}
-    depends_on:
-      - wiremock
-
-  wiremock:
-    container_name: wiremock
-    image: wiremock/wiremock:3.13.2
-    volumes:
-      - ./tests/wiremock/mappings:/home/wiremock/mappings
-    ports:
-      - 8080:8080
