@@ -1,6 +1,6 @@
 module github.com/ricoberger/grafana-istio-plugin
 
-go 1.26.0
+go 1.26.2
 
 require (
 	github.com/grafana/grafana-plugin-sdk-go v0.292.0
