@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.2.1](https://github.com/ricoberger/grafana-istio-plugin/tree/v0.2.1) (2026-06-21)
+
+[Full Changelog](https://github.com/ricoberger/grafana-istio-plugin/compare/v0.2.0...v0.2.1)
+
+- chore: bump @grafana/create-plugin configuration to 7.7.0 [\#55](https://github.com/ricoberger/grafana-istio-plugin/pull/55) ([ricoberger](https://github.com/ricoberger))
+- chore\(deps\): update grafana packages [\#52](https://github.com/ricoberger/grafana-istio-plugin/pull/52) ([ricoberger](https://github.com/ricoberger))
+- test\(e2e\): remove e2e tests [\#46](https://github.com/ricoberger/grafana-istio-plugin/pull/46) ([ricoberger](https://github.com/ricoberger))
+- style: use regular functions and organize imports [\#39](https://github.com/ricoberger/grafana-istio-plugin/pull/39) ([ricoberger](https://github.com/ricoberger))
+- chore: bump @grafana/create-plugin configuration to 7.0.0 [\#31](https://github.com/ricoberger/grafana-istio-plugin/pull/31) ([ricoberger](https://github.com/ricoberger))
+- Fix Config Editor [\#28](https://github.com/ricoberger/grafana-istio-plugin/pull/28) ([ricoberger](https://github.com/ricoberger))
+- Update Go Version to 1.26.0 and Grafana Packages [\#27](https://github.com/ricoberger/grafana-istio-plugin/pull/27) ([ricoberger](https://github.com/ricoberger))
+- chore: bump @grafana/create-plugin configuration to 6.8.3 [\#23](https://github.com/ricoberger/grafana-istio-plugin/pull/23) ([ricoberger](https://github.com/ricoberger))
+
 ## [v0.2.0](https://github.com/ricoberger/grafana-istio-plugin/tree/v0.2.0) (2025-12-27)
 
 [Full Changelog](https://github.com/ricoberger/grafana-istio-plugin/compare/v0.1.0...v0.2.0)
