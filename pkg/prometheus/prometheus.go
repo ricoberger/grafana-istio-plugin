@@ -28,7 +28,7 @@ func (c *client) CheckHealth(ctx context.Context) error {
 }
 
 func (c *client) GetLabelValues(ctx context.Context, query LabelValuesQuery, timeRange backend.TimeRange) ([]string, error) {
-	labelValues, _, err := c.api.LabelValues(ctx, query.Label, query.Matches, timeRange.From, timeRange.To)
+	labelValues, _, _, err := c.api.LabelValues(ctx, query.Label, query.Matches, timeRange.From, timeRange.To)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (c *client) GetLabelValues(ctx context.Context, query LabelValuesQuery, tim
 }
 
 func (c *client) GetMetrics(ctx context.Context, metric, query string, timeRange backend.TimeRange) ([]Metric, error) {
-	result, _, err := c.api.Query(ctx, query, timeRange.To)
+	result, _, _, err := c.api.Query(ctx, query, timeRange.To)
 	if err != nil {
 		return nil, err
 	}
