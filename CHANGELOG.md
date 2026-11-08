@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.3.0](https://github.com/ricoberger/grafana-istio-plugin/tree/v0.3.0) (2026-11-08)
+
+[Full Changelog](https://github.com/ricoberger/grafana-istio-plugin/compare/v0.2.1...v0.3.0)
+
+- chore: dependency updates [\#84](https://github.com/ricoberger/grafana-istio-plugin/pull/84) ([ricoberger](https://github.com/ricoberger))
+- chore: bump @grafana/create-plugin configuration to 7.17.0 [\#81](https://github.com/ricoberger/grafana-istio-plugin/pull/81) ([ricoberger](https://github.com/ricoberger))
+- chore: bump @grafana/create-plugin configuration to 7.11.0 [\#76](https://github.com/ricoberger/grafana-istio-plugin/pull/76) ([ricoberger](https://github.com/ricoberger))
+- chore: update dependencies [\#68](https://github.com/ricoberger/grafana-istio-plugin/pull/68) ([ricoberger](https://github.com/ricoberger))
+- chore: bump @grafana/create-plugin configuration to 7.9.1 [\#64](https://github.com/ricoberger/grafana-istio-plugin/pull/64) ([ricoberger](https://github.com/ricoberger))
+
 ## [v0.2.1](https://github.com/ricoberger/grafana-istio-plugin/tree/v0.2.1) (2026-06-21)
 
 [Full Changelog](https://github.com/ricoberger/grafana-istio-plugin/compare/v0.2.0...v0.2.1)
